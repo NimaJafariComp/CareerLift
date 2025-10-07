@@ -1,9 +1,5 @@
 CareerLift
 
-Career Development Platform built with a modern tech stack.
-
-Tech Stack
-
 Backend
 - **Python 3.12** with **FastAPI** - High-performance async API framework
 - **Pydantic** - Data validation and settings management
@@ -54,13 +50,7 @@ Edit `.env` if you need to change default values.
 
 3. Build and start all services
 
-Using Make:
-```bash
-make build
-make up
-```
-
-Or using Docker Compose directly:
+using Docker Compose directly:
 ```bash
 DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose build
 docker-compose up -d
