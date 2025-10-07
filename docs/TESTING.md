@@ -12,18 +12,16 @@ docker compose --version
 
 Step 1: Start Docker Services
 
-Build with BuildKit
+Build and start all services:
 
 ```bash
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
-docker compose build
+docker compose up --build -d
 ```
 
-Start all services
+Or use watch mode for development:
 
 ```bash
-docker compose up -d
+docker compose watch
 ```
 
 Check service status
@@ -328,8 +326,7 @@ Restart fresh
 
 ```bash
 docker compose down -v
-docker compose build
-docker compose up -d
+docker compose up --build -d
 ```
 
 Troubleshooting Tests

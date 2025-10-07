@@ -47,18 +47,19 @@ cp .env.example .env
 
 Edit `.env` if you need to change default values.
 
-3. Build and start all services
+3. Build and start all services with Docker
 
+Standard mode:
 ```bash
-DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build
-docker compose up -d
+docker compose up --build -d
 ```
 
-Or with watch mode for automatic file synchronization:
-
+Watch mode (recommended for development):
 ```bash
 docker compose watch
 ```
+
+Watch mode enables automatic file synchronization and hot-reloading for all services.
 
 4. Access the services
 
@@ -77,30 +78,25 @@ docker compose exec ollama ollama pull gpt-oss:20b-cloud
 
 Desktop Application (Electron)
 
-Development Mode
+1. Ensure Docker services are running:
+```bash
+docker compose up -d
+```
 
-1. Ensure the frontend is running on http://localhost:3000
-2. Install Electron dependencies:
-
+2. Install and run Electron:
 ```bash
 cd electron
 npm install
-```
-
-3. Start Electron:
-
-```bash
 npm run dev
 ```
 
-Production Build
-
+For production builds:
 ```bash
 cd electron
-npm run build        # Build for current platform
-npm run build:mac    # Build for macOS
-npm run build:win    # Build for Windows
-npm run build:linux  # Build for Linux
+npm run build        # Current platform
+npm run build:mac    # macOS
+npm run build:win    # Windows
+npm run build:linux  # Linux
 ```
 
 Project Structure
@@ -231,10 +227,9 @@ Troubleshooting
 
 Docker BuildKit Issues
 
-Ensure BuildKit is enabled:
+BuildKit is enabled by default in modern Docker. If you encounter issues:
 ```bash
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
+docker compose up --build
 ```
 
 Neo4j Connection Issues
