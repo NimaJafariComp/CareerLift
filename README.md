@@ -68,11 +68,6 @@ docker-compose up -d
 After services are running, pull an LLM model:
 
 ```bash
-docker-compose exec ollama ollama pull llama2
-```
-
-Or for a more capable model:
-```bash
 docker-compose exec ollama ollama pull llama3.2
 ```
 
