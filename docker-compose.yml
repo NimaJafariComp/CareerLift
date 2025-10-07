@@ -1,7 +1,7 @@
 services:
   neo4j:
     image: neo4j:latest
-    container_name: careerlift-neo4j
+    container_name: neo4j
     ports:
       - "7474:7474"  # HTTP
       - "7687:7687"  # Bolt
@@ -26,7 +26,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: careerlift-ollama
+    container_name: ollama
     ports:
       - "11434:11434"
     volumes:
@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    container_name: careerlift-backend
+    container_name: backend
     ports:
       - "8000:8000"
     environment:
@@ -66,6 +66,16 @@ services:
       ollama:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    develop:
+      watch:
+        - action: sync
+          path: ./backend
+          target: /app
+          ignore:
+            - __pycache__/
+            - "*.pyc"
+        - action: rebuild
+          path: ./backend/requirements.txt
 
   frontend:
     build:
@@ -73,7 +83,7 @@ services:
       dockerfile: Dockerfile
       args:
         BUILDKIT_INLINE_CACHE: 1
-    container_name: careerlift-frontend
+    container_name: frontend
     ports:
       - "3000:3000"
     environment:
@@ -88,6 +98,16 @@ services:
     depends_on:
       - backend
     command: npm run dev
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend
+          target: /app
+          ignore:
+            - node_modules/
+            - .next/
+        - action: rebuild
+          path: ./frontend/package.json
 
 networks:
   careerlift-network:

@@ -1,21 +1,21 @@
 CareerLift
 
 Backend
-- **Python 3.12** with **FastAPI** - High-performance async API framework
-- **Pydantic** - Data validation and settings management
-- **LangChain** - LLM orchestration and LLM workflows
-- **Playwright** - Web scraping and automation
-- **Ollama** - Local LLM inference
+- Python 3.12 with FastAPI - High-performance async API framework
+- Pydantic - Data validation and settings management
+- LangChain - LLM orchestration and LLM workflows
+- Playwright - Web scraping and automation
+- Ollama - Local LLM inference
 
 Database
 - Neo4j (Latest) - Graph database for career relationships and paths
 
 Frontend
-- **Next.js 15** - React framework with App Router
-- **React 19** - Latest React with new features
-- **TypeScript** - Type-safe development
-- **Tailwind CSS 3** - Utility-first CSS framework
-- **Axios** - HTTP client for API calls
+- Next.js 15 - React framework with App Router
+- React 19 - Latest React with new features
+- TypeScript - Type-safe development
+- Tailwind CSS 3 - Utility-first CSS framework
+- Axios - HTTP client for API calls
 
 Desktop
 - Electron (Latest) - Cross-platform desktop application wrapper
@@ -27,9 +27,8 @@ Infrastructure
 Prerequisites
 
 - Docker Desktop (with BuildKit enabled)
-- Node.js 22+ (for local development)
-- Python 3.12+ (for local development)
-- Make (optional, for using Makefile commands)
+- Node.js 22+ (for Electron desktop app)
+- Git
 
 Quick Start
 
@@ -50,25 +49,30 @@ Edit `.env` if you need to change default values.
 
 3. Build and start all services
 
-using Docker Compose directly:
 ```bash
-DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose build
-docker-compose up -d
+DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build
+docker compose up -d
+```
+
+Or with watch mode for automatic file synchronization:
+
+```bash
+docker compose watch
 ```
 
 4. Access the services
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Neo4j Browser**: http://localhost:7474
-- **API Documentation**: http://localhost:8000/docs
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Neo4j Browser: http://localhost:7474
+- API Documentation: http://localhost:8000/docs
 
 5. Pull Ollama model
 
 After services are running, pull an LLM model:
 
 ```bash
-docker-compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull gpt-oss:20b-cloud
 ```
 
 Desktop Application (Electron)
@@ -126,43 +130,38 @@ CareerLift/
 │   ├── preload.js        # Preload script
 │   └── package.json
 ├── docker-compose.yml    # Multi-container setup
-├── Makefile             # Development commands
 └── README.md
 ```
 
 Development
 
-Backend Development
+Watch Mode
+
+Docker Compose watch mode enables automatic file synchronization and rebuilds:
 
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+docker compose watch
 ```
 
-Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
+This will:
+- Sync backend Python files to the container automatically
+- Sync frontend files to the container automatically
+- Rebuild backend when requirements.txt changes
+- Rebuild frontend when package.json changes
 
 View Logs
 
 ```bash
-make logs                          # All services
-docker-compose logs -f backend     # Backend only
-docker-compose logs -f frontend    # Frontend only
+docker compose logs -f              # All services
+docker compose logs -f backend      # Backend only
+docker compose logs -f frontend     # Frontend only
 ```
 
 Access Container Shells
 
 ```bash
-make backend-shell
-make frontend-shell
+docker compose exec backend sh
+docker compose exec frontend sh
 ```
 
 Testing
@@ -170,36 +169,36 @@ Testing
 Backend Tests
 
 ```bash
-docker-compose exec backend pytest
+docker compose exec backend pytest
 ```
 
 Frontend Tests
 
 ```bash
-docker-compose exec frontend npm test
+docker compose exec frontend npm test
 ```
 
 Cleanup
 
 ```bash
-make clean  # Stop containers and remove volumes
+docker compose down -v
 ```
 
 Neo4j Database
 
 Default credentials:
-- **URL**: bolt://localhost:7687
-- **Username**: neo4j
-- **Password**: password123
+- URL: bolt://localhost:7687
+- Username: neo4j
+- Password: password123
 
 Access Neo4j Browser at http://localhost:7474 to visualize and query your graph data.
 
 LLM Features
 
-- **Career Advice**: Get personalized career recommendations based on your profile
-- **Job Analysis**: Analyze job descriptions and extract key requirements
-- **Resume Feedback**: Receive LLM-based feedback on your resume
-- **Web Scraping**: Extract job postings and company information from websites
+- Career Advice: Get personalized career recommendations based on your profile
+- Job Analysis: Analyze job descriptions and extract key requirements
+- Resume Feedback: Receive LLM-based feedback on your resume
+- Web Scraping: Extract job postings and company information from websites
 
 Environment Variables
 
@@ -214,8 +213,8 @@ Key environment variables (see `.env.example`):
 API Documentation
 
 Once the backend is running, visit:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 Contributing
 
@@ -242,15 +241,15 @@ Neo4j Connection Issues
 
 Check if Neo4j is healthy:
 ```bash
-docker-compose ps
-docker-compose logs neo4j
+docker compose ps
+docker compose logs neo4j
 ```
 
 Ollama Model Not Found
 
 Pull a model first:
 ```bash
-docker-compose exec ollama ollama pull llama2
+docker compose exec ollama ollama pull gpt-oss:20b-cloud
 ```
 
 Port Conflicts

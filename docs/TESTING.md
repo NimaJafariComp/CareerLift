@@ -7,7 +7,7 @@ Prerequisites
 Ensure Docker is running:
 ```bash
 docker --version
-docker-compose --version
+docker compose --version
 ```
 
 Step 1: Start Docker Services
@@ -17,19 +17,19 @@ Build with BuildKit
 ```bash
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
-docker-compose build
+docker compose build
 ```
 
 Start all services
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 Check service status
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 Expected output: All services should be "Up" and "healthy"
@@ -40,7 +40,7 @@ Access Neo4j Browser
 
 Open http://localhost:7474 in your browser
 
-**Login credentials:**
+Login credentials:
 - URL: `bolt://localhost:7687`
 - Username: `neo4j`
 - Password: `password123`
@@ -55,7 +55,7 @@ RETURN n
 Verify from command line
 
 ```bash
-docker-compose exec neo4j cypher-shell -u neo4j -p password123 "RETURN 'Neo4j Connected!' as message"
+docker compose exec neo4j cypher-shell -u neo4j -p password123 "RETURN 'Neo4j Connected!' as message"
 ```
 
 Step 3: Test Ollama LLM Service
@@ -69,24 +69,24 @@ curl http://localhost:11434/api/tags
 Pull a model
 
 ```bash
-docker-compose exec ollama ollama pull llama2
+docker compose exec ollama ollama pull llama2
 ```
 
 Or for better performance (requires more RAM):
 ```bash
-docker-compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull gpt-oss:20b-cloud
 ```
 
 Test model inference
 
 ```bash
-docker-compose exec ollama ollama run llama2 "Hello, tell me about career development in one sentence."
+docker compose exec ollama ollama run llama2 "Hello, tell me about career development in one sentence."
 ```
 
 List available models
 
 ```bash
-docker-compose exec ollama ollama list
+docker compose exec ollama ollama list
 ```
 
 Step 4: Test Backend API
@@ -117,8 +117,8 @@ curl http://localhost:8000/
 
 Access API documentation
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 Test creating a career goal
 
@@ -195,13 +195,13 @@ Step 6: Test Backend with pytest
 Run all tests
 
 ```bash
-docker-compose exec backend pytest -v
+docker compose exec backend pytest -v
 ```
 
 Run tests with coverage
 
 ```bash
-docker-compose exec backend pytest --cov=app --cov-report=html
+docker compose exec backend pytest --cov=app --cov-report=html
 ```
 
 View coverage report
@@ -241,11 +241,11 @@ Step 8: Integration Testing
 
 Test complete workflow
 
-1. **Create a career goal** via API or frontend
-2. **Add skills** to your profile
-3. **Request LLM advice** with your current and target roles
-4. **Analyze a job description**
-5. **Verify data in Neo4j** Browser
+1. Create a career goal via API or frontend
+2. Add skills to your profile
+3. Request LLM advice with your current and target roles
+4. Analyze a job description
+5. Verify data in Neo4j Browser
 
 Example integration test script
 
@@ -298,10 +298,10 @@ docker stats
 Check logs for errors
 
 ```bash
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f neo4j
-docker-compose logs -f ollama
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f neo4j
+docker compose logs -f ollama
 ```
 
 Step 10: Cleanup and Reset
@@ -309,13 +309,13 @@ Step 10: Cleanup and Reset
 Stop all services
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 Remove all data (including databases)
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 Clean Docker system
@@ -327,9 +327,9 @@ docker system prune -f
 Restart fresh
 
 ```bash
-make clean
-make build
-make up
+docker compose down -v
+docker compose build
+docker compose up -d
 ```
 
 Troubleshooting Tests
@@ -337,30 +337,30 @@ Troubleshooting Tests
 Backend fails to start
 
 ```bash
-docker-compose logs backend
+docker compose logs backend
 # Check for Python errors or missing dependencies
 ```
 
 Neo4j connection timeout
 
 ```bash
-docker-compose exec neo4j cypher-shell -u neo4j -p password123 "RETURN 1"
+docker compose exec neo4j cypher-shell -u neo4j -p password123 "RETURN 1"
 # Verify credentials and wait for healthcheck to pass
 ```
 
 Ollama model not responding
 
 ```bash
-docker-compose exec ollama ollama list
+docker compose exec ollama ollama list
 # Ensure a model is pulled
-docker-compose exec ollama ollama pull llama2
+docker compose exec ollama ollama pull llama2
 ```
 
 Frontend cannot connect to backend
 
 ```bash
 # Check environment variables
-docker-compose exec frontend env | grep NEXT_PUBLIC_API_URL
+docker compose exec frontend env | grep NEXT_PUBLIC_API_URL
 # Should be http://localhost:8000
 ```
 
@@ -425,7 +425,7 @@ test_service "Frontend homepage"
 
 echo ""
 echo "5. Testing Backend pytest..."
-docker-compose exec -T backend pytest -v
+docker compose exec -T backend pytest -v
 test_service "Backend unit tests"
 
 echo ""

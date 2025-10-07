@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # Ollama
     ollama_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "gpt-oss:20b-cloud"
 
     # CORS
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
