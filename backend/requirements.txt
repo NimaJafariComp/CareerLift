@@ -47,4 +47,5 @@ mypy>=1.11.0,<2.0.0
 >>>>>>> 4ced2bf (fix issue)
 
 
+
 firecrawl-py
