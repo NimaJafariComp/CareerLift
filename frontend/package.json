@@ -18,7 +18,11 @@
     "@types/node": "^24.7.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
+<<<<<<< HEAD
     "tailwindcss": "^4.1.14",
+=======
+    "tailwindcss": "^4",
+>>>>>>> 56726d2c40716e92f63860444f3e2baf1fe36c67
     "typescript": "^5.9.3"
   }
 }
