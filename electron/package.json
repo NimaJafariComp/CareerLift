@@ -5,13 +5,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "NODE_ENV=development electron .",
     "build:frontend": "cd ../frontend && npm run build",
     "build": "npm run build:frontend && electron-builder",
     "build:mac": "npm run build:frontend && electron-builder --mac",
     "build:win": "npm run build:frontend && electron-builder --win",
     "build:linux": "npm run build:frontend && electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "dev": "cross-env NODE_ENV=development electron ."
   },
   "keywords": [
     "career",
@@ -25,6 +25,7 @@
     "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   },
