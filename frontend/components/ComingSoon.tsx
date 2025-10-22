@@ -13,13 +13,13 @@ export function ComingSoon({ title, blurb = "This feature is under active develo
       <h1 className="text-[40px] font-semibold tracking-tight heading-gradient mb-6">
         {title}
       </h1>
-      <div className="card hover-ring mb-10">
+      <div className="card hover-ring mb-10 card-hue">
         <div className="flex flex-col gap-5">
           <p className="text-muted text-[15px] leading-relaxed">
             {blurb}
           </p>
-          <div className="rounded-md border card-3d border-dashed border-[rgba(255,255,255,0.14)] p-6 text-sm text-[#7e8a98] bg-[#121c27]/40">
-            <p className="mb-2 font-medium text-[#d5dde4]">Coming Soon</p>
+          <div className="rounded-md border card-3d border-dashed border-[rgba(255,255,255,0.14)] p-6 text-sm text-[#7e8a98] bg-[#121c27]/40 panel-tinted">
+            <p className="mb-2 font-medium text-muted">Coming Soon</p>
             <ul className="list-disc ml-5 space-y-1 text-[13px]">
               <li>Core interactions and API wiring</li>
               <li>Real data + analytics layer</li>

@@ -22,12 +22,12 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-[40px] font-semibold tracking-tight heading-gradient mb-6">Settings</h1>
         <p className="text-[13px] text-[var(--muted)] mt-1">Personalize the app, manage your plan, and review resume attachments.</p>
       </header>
 
       {/* UI Preferences */}
-      <section className="card rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
+      <section className="card-3d rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
         <h2 className="text-lg font-medium mb-4">UI Preferences</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -79,7 +79,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Subscription placeholder */}
-      <section className="card rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
+      <section className="card-3d rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
         <h2 className="text-lg font-medium mb-4">Manage Subscription</h2>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -97,7 +97,7 @@ export default function SettingsPage() {
       </section>
 
       {/* user attachement (resume) placeholder, will be completed after working resume parser */}
-      <section className="card rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
+      <section className="card-3d rounded-xl border border-[var(--border-color)] bg-[var(--background-alt)]/50 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium">Resume Attachments</h2>
           <div className="flex items-center gap-2">
