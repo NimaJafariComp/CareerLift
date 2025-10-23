@@ -63,6 +63,7 @@ services:
       - ./backend:/app
       - backend_cache:/root/.cache
       - ./backend/app/data:/app/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - careerlift-network
     depends_on:

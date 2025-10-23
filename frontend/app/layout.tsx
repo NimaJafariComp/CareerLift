@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { PreferencesProvider } from "@/components/PreferencesProvider";
 import Sidebar from "@/components/Sidebar";
+import OllamaStatus from "@/components/OllamaStatus";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
           <Sidebar />
           <div className="flex-1 min-w-0 px-10 py-12 fade-in"><PreferencesProvider>{children}</PreferencesProvider></div>
         </div>
+        <OllamaStatus />
       </body>
     </html>
   );

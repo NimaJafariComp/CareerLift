@@ -11,19 +11,17 @@ interface GraphData {
     location?: string;
     summary?: string;
   };
-  skills: Array<{ name: string; category?: string }>;
+  skills: Array<string>;
   experiences: Array<{
     title: string;
     company: string;
-    start_date?: string;
-    end_date?: string;
+    duration?: string;
     description?: string;
   }>;
   education: Array<{
     degree: string;
     institution: string;
-    graduation_date?: string;
-    gpa?: string;
+    year?: string;
   }>;
 }
 
@@ -102,7 +100,12 @@ export default function ResumeLabPage() {
       setResult(response.data);
       setFile(null);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to upload resume. Please try again.");
+      const errorDetail = err.response?.data?.detail;
+      if (typeof errorDetail === 'object') {
+        setError(errorDetail.message || errorDetail.error || "Failed to process resume. Please try again.");
+      } else {
+        setError(errorDetail || "Failed to process resume. Please try again.");
+      }
     } finally {
       setUploading(false);
     }
@@ -251,7 +254,7 @@ export default function ResumeLabPage() {
                       key={idx}
                       className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[13px]"
                     >
-                      {skill.name}
+                      {skill}
                     </span>
                   ))}
                 </div>
@@ -267,9 +270,9 @@ export default function ResumeLabPage() {
                     <div key={idx} className="panel-tinted p-4 rounded-lg">
                       <p className="text-[15px] font-medium">{exp.title}</p>
                       <p className="text-[14px] text-blue-400">{exp.company}</p>
-                      {(exp.start_date || exp.end_date) && (
+                      {exp.duration && (
                         <p className="text-[13px] text-muted mt-1">
-                          {exp.start_date} - {exp.end_date || "Present"}
+                          {exp.duration}
                         </p>
                       )}
                       {exp.description && (
@@ -290,11 +293,8 @@ export default function ResumeLabPage() {
                     <div key={idx} className="panel-tinted p-4 rounded-lg">
                       <p className="text-[15px] font-medium">{edu.degree}</p>
                       <p className="text-[14px] text-blue-400">{edu.institution}</p>
-                      {edu.graduation_date && (
-                        <p className="text-[13px] text-muted mt-1">Graduated: {edu.graduation_date}</p>
-                      )}
-                      {edu.gpa && (
-                        <p className="text-[13px] text-muted">GPA: {edu.gpa}</p>
+                      {edu.year && (
+                        <p className="text-[13px] text-muted mt-1">{edu.year}</p>
                       )}
                     </div>
                   ))}

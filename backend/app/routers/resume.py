@@ -58,7 +58,19 @@ async def upload_resume(
         }
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e)
+        # Check if this is an Ollama auth error
+        if error_msg.startswith("OLLAMA_AUTH_REQUIRED:"):
+            signin_url = error_msg.split(":", 1)[1] if ":" in error_msg else None
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": "Ollama authentication required",
+                    "signin_url": signin_url,
+                    "message": "Please sign in to Ollama to process resumes"
+                }
+            )
+        raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing resume: {str(e)}")
 

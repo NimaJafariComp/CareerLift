@@ -10,7 +10,7 @@ import os
 from app.core.config import settings
 from app.core.database import neo4j_db
 from app.services.scraper_service import scraper_service
-from app.routers import career, scraper, resume
+from app.routers import career, scraper, resume, ollama
 
 
 NEO4J_URI = os.getenv("NEO4J_URI")
@@ -55,6 +55,7 @@ app.include_router(career.router)
 app.include_router(scraper.router)
 app.include_router(jobs_router.router)
 app.include_router(resume.router)
+app.include_router(ollama.router)
 
 
 @app.get("/")

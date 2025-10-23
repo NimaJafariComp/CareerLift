@@ -23,6 +23,9 @@ class KnowledgeGraphService:
 
         Returns:
             Dictionary containing nodes and relationships for Neo4j
+
+        Raises:
+            ValueError: If authentication is required (401)
         """
         prompt = f"""Extract information from this resume and return ONLY valid JSON.
 
@@ -37,18 +40,34 @@ Return JSON with this exact structure:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         async with httpx.AsyncClient(timeout=180.0) as client:
-            response = await client.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False
-                },
-                headers=headers
-            )
-            response.raise_for_status()
-            result = response.json()
-            llm_response = result.get("response", "")
+            try:
+                response = await client.post(
+                    f"{self.ollama_url}/api/generate",
+                    json={
+                        "model": self.model,
+                        "prompt": prompt,
+                        "stream": False
+                    },
+                    headers=headers
+                )
+                response.raise_for_status()
+                result = response.json()
+                llm_response = result.get("response", "")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    # Get signin URL from error response
+                    signin_url = None
+                    try:
+                        error_data = e.response.json()
+                        signin_url = error_data.get("signin_url")
+                    except:
+                        pass
+
+                    error_msg = "Ollama authentication required"
+                    if signin_url:
+                        error_msg = f"OLLAMA_AUTH_REQUIRED:{signin_url}"
+                    raise ValueError(error_msg)
+                raise
 
         # Parse the JSON response
         try:
