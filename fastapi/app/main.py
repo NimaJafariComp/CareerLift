@@ -4,8 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .routers import job as jobs_router
-from neo4j import GraphDatabase
-import os
 
 from app.core.config import settings
 from app.core.database import neo4j_db
@@ -13,16 +11,13 @@ from app.services.scraper_service import scraper_service
 from app.routers import career, scraper, resume, ollama
 
 
-NEO4J_URI = os.getenv("NEO4J_URI")
-NEO4J_USER = os.getenv("NEO4J_USER")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
     print("Starting CareerLift Backend...")
     await neo4j_db.connect()
+    await neo4j_db.initialize_schema()
     await scraper_service.initialize()
     print("All services initialized")
 
@@ -79,13 +74,3 @@ async def health():
             "playwright": "initialized"
         }
     }
-
-@app.on_event("startup")
-async def ensure_job_constraints():
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    with driver.session() as s:
-        s.run("""
-            CREATE CONSTRAINT job_apply_url_unique IF NOT EXISTS
-            FOR (j:JobPosting) REQUIRE j.apply_url IS UNIQUE
-        """)
-    driver.close()

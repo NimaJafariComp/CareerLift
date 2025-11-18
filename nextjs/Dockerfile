@@ -1,5 +1,5 @@
-# syntax=docker/dockerfile:1.4
-FROM node:22-alpine
+# syntax=docker/dockerfile:latest
+FROM node:latest
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ COPY package*.json ./
 
 # Install dependencies with cache mount
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+    npm install
 
 # Copy application files
 COPY . .

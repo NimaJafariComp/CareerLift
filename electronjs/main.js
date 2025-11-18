@@ -50,13 +50,13 @@ function createWindow() {
     mainWindow.webContents.openDevTools()
   } else {
     // In production, load from built Next.js static export
-    const indexPath = path.join(__dirname, '../frontend/out/index.html')
+    const indexPath = path.join(__dirname, '../nextjs/out/index.html')
 
     if (fs.existsSync(indexPath)) {
       console.log('Loading production build from:', indexPath)
       mainWindow.loadFile(indexPath)
     } else {
-      console.error('Production build not found. Please run: cd frontend && npm run build')
+      console.error('Production build not found. Please run: cd nextjs && npm run build')
       // Fallback to development server
       mainWindow.loadURL('http://localhost:3000')
     }

@@ -49,6 +49,39 @@ class Neo4jConnection:
         async with self.driver.session(database=database) as session:
             yield session
 
+    async def initialize_schema(self):
+        """Initialize Neo4j schema with constraints and indexes."""
+        async with self.session() as session:
+            # Create constraint for Person.name (unique identifier)
+            await session.run("""
+                CREATE CONSTRAINT person_name_unique IF NOT EXISTS
+                FOR (p:Person) REQUIRE p.name IS UNIQUE
+            """)
+
+            # Create constraint for JobPosting.apply_url (unique identifier)
+            await session.run("""
+                CREATE CONSTRAINT job_apply_url_unique IF NOT EXISTS
+                FOR (j:JobPosting) REQUIRE j.apply_url IS UNIQUE
+            """)
+
+            # Create indexes for commonly queried properties
+            await session.run("""
+                CREATE INDEX skill_name_index IF NOT EXISTS
+                FOR (s:Skill) ON (s.name)
+            """)
+
+            await session.run("""
+                CREATE INDEX experience_title_index IF NOT EXISTS
+                FOR (e:Experience) ON (e.title)
+            """)
+
+            await session.run("""
+                CREATE INDEX education_degree_index IF NOT EXISTS
+                FOR (ed:Education) ON (ed.degree)
+            """)
+
+            print("Neo4j schema initialized (constraints and indexes created)")
+
 
 # Global database instance
 neo4j_db = Neo4jConnection()
