@@ -30,11 +30,12 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Scrollbar (Webkit) */
-body::-webkit-scrollbar { width: 10px; }
-body::-webkit-scrollbar-track { background: #0b0f17; }
-body::-webkit-scrollbar-thumb { background: #1f2b3a; border-radius: 20px; }
-body::-webkit-scrollbar-thumb:hover { background: #22394d; }
+/* Scrollbar — unified style for body + .styled-scrollbar */
+body, .styled-scrollbar { scrollbar-color: #1f2b3a #0b0f17; scrollbar-width: auto; }
+body::-webkit-scrollbar, .styled-scrollbar::-webkit-scrollbar { width: 10px; }
+body::-webkit-scrollbar-track, .styled-scrollbar::-webkit-scrollbar-track { background: #0b0f17; }
+body::-webkit-scrollbar-thumb, .styled-scrollbar::-webkit-scrollbar-thumb { background: #1f2b3a; border-radius: 20px; }
+body::-webkit-scrollbar-thumb:hover, .styled-scrollbar::-webkit-scrollbar-thumb:hover { background: #22394d; }
 
 /* Layout helpers */
 .app-bg { background: var(--background-gradient), var(--background); }

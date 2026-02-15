@@ -3,11 +3,13 @@ import React from "react";
 interface Props {
   previewImageUrl: string | null;
   pageCount?: number;
+  currentPage?: number;
   uploadedFileUrl?: string | null;
   showUploaded?: boolean;
   isRecompiling?: boolean;
   onDownloadPdf?: () => void;
   downloadingPdf?: boolean;
+  onPageChange?: (page: number) => void;
 }
 
 function Spinner({ className }: { className: string }) {
@@ -21,13 +23,19 @@ function Spinner({ className }: { className: string }) {
 
 export default function PdfViewer({
   previewImageUrl,
-  pageCount,
+  pageCount = 0,
+  currentPage = 0,
   uploadedFileUrl,
   showUploaded,
   isRecompiling,
   onDownloadPdf,
   downloadingPdf,
+  onPageChange,
 }: Props) {
+  const hasMultiplePages = pageCount > 1;
+  const canPrev = currentPage > 0;
+  const canNext = currentPage < pageCount - 1;
+
   // Show uploaded PDF via iframe (unchanged fallback)
   if (showUploaded && uploadedFileUrl) {
     return (
@@ -63,15 +71,9 @@ export default function PdfViewer({
 
   return (
     <div className="card hover-ring card-hue mb-6">
+      {/* Header: title + page nav + download */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[20px] font-medium">
-          PDF Preview
-          {pageCount && pageCount > 1 && (
-            <span className="text-[13px] text-muted font-normal ml-2">
-              Page 1 of {pageCount}
-            </span>
-          )}
-        </h2>
+        <h2 className="text-[20px] font-medium">PDF Preview</h2>
         {onDownloadPdf && (
           <button
             onClick={onDownloadPdf}
@@ -104,6 +106,37 @@ export default function PdfViewer({
           </button>
         )}
       </div>
+
+      {/* Page navigation bar */}
+      {hasMultiplePages && (
+        <div className="flex items-center justify-center gap-3 mb-3">
+          <button
+            onClick={() => onPageChange?.(currentPage - 1)}
+            disabled={!canPrev || isRecompiling}
+            className="p-1.5 rounded-lg border border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Previous page"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <span className="text-[13px] text-muted tabular-nums">
+            Page {currentPage + 1} of {pageCount}
+          </span>
+          <button
+            onClick={() => onPageChange?.(currentPage + 1)}
+            disabled={!canNext || isRecompiling}
+            className="p-1.5 rounded-lg border border-[rgba(255,255,255,0.14)] hover:bg-[rgba(255,255,255,0.06)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="Next page"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Preview image */}
       <div className="relative">
         {isRecompiling && (
           <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-blue-600/90 text-white text-[12px] font-medium px-2.5 py-1 rounded-full backdrop-blur-sm">
@@ -114,7 +147,7 @@ export default function PdfViewer({
         <div className="bg-white rounded-lg border border-[rgba(255,255,255,0.14)] overflow-hidden">
           <img
             src={previewImageUrl}
-            alt="Resume preview"
+            alt={`Resume preview — page ${currentPage + 1}`}
             className="w-full h-auto"
           />
         </div>

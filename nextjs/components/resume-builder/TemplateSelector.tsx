@@ -22,7 +22,7 @@ export default function TemplateSelector({
   return (
     <div className="card hover-ring card-hue mb-6">
       <h2 className="text-[20px] font-medium mb-3">Select Template</h2>
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-3 overflow-x-auto pb-2 styled-scrollbar">
         {hasUploadedFile && (
           <button
             onClick={() => onSelect("uploaded")}

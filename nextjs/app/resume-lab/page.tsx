@@ -92,7 +92,7 @@ export default function ResumeLabPage() {
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Auto-compile hook
-  const { previewImageUrl, pageCount, compiling, compileError, isRecompiling, triggerCompile, lastCompileTime } =
+  const { previewImageUrl, pageCount, currentPage, compiling, compileError, isRecompiling, triggerCompile, goToPage, lastCompileTime } =
     useAutoCompile({ resumeData, selectedTemplate, apiUrl: API_URL, debounceMs: 1500 });
 
   // Whether the builder (editor + PDF) is active
@@ -546,16 +546,18 @@ export default function ResumeLabPage() {
             />
           </div>
 
-          {/* PDF panel - takes remaining space, sticky on xl */}
-          <div className="flex-1 min-w-0 xl:sticky xl:top-6 xl:self-start">
+          {/* PDF panel - takes remaining space, sticky + scrollable on xl */}
+          <div className="flex-1 min-w-0 xl:sticky xl:top-6 xl:self-start xl:max-h-[calc(100vh-3rem)] xl:overflow-y-auto styled-scrollbar">
             <PdfViewer
               previewImageUrl={previewImageUrl}
               pageCount={pageCount}
+              currentPage={currentPage}
               uploadedFileUrl={uploadedFileUrl}
               showUploaded={false}
               isRecompiling={isRecompiling}
               onDownloadPdf={handleDownloadPdf}
               downloadingPdf={downloadingPdf}
+              onPageChange={goToPage}
             />
           </div>
         </div>

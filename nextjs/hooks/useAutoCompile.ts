@@ -12,10 +12,12 @@ interface UseAutoCompileOptions {
 interface UseAutoCompileResult {
   previewImageUrl: string | null;
   pageCount: number;
+  currentPage: number;
   compiling: boolean;
   compileError: string | null;
   isRecompiling: boolean;
   triggerCompile: () => void;
+  goToPage: (page: number) => void;
   lastCompileTime: number | null;
 }
 
@@ -27,12 +29,14 @@ export function useAutoCompile({
 }: UseAutoCompileOptions): UseAutoCompileResult {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const [compiling, setCompiling] = useState(false);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [lastCompileTime, setLastCompileTime] = useState<number | null>(null);
 
   const resumeDataRef = useRef(resumeData);
   const selectedTemplateRef = useRef(selectedTemplate);
+  const currentPageRef = useRef(0);
   const hasPreviewRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -42,10 +46,12 @@ export function useAutoCompile({
   // Keep refs in sync
   resumeDataRef.current = resumeData;
   selectedTemplateRef.current = selectedTemplate;
+  currentPageRef.current = currentPage;
 
-  const doCompile = useCallback(async () => {
+  const doCompile = useCallback(async (page?: number) => {
     const data = resumeDataRef.current;
     const template = selectedTemplateRef.current;
+    const targetPage = page ?? currentPageRef.current;
 
     if (!data || !template || template === "uploaded") return;
 
@@ -63,7 +69,7 @@ export function useAutoCompile({
 
     try {
       const response = await axios.post(
-        `${apiUrl}/api/latex/compile/preview`,
+        `${apiUrl}/api/latex/compile/preview?page=${targetPage}`,
         {
           template_id: template,
           resume_data: data,
@@ -106,7 +112,6 @@ export function useAutoCompile({
 
       if (err.response?.data) {
         try {
-          // Error response is a blob, read it as text
           const text = await (err.response.data as Blob).text();
           const json = JSON.parse(text);
           setCompileError(json.detail || "Compilation failed");
@@ -132,10 +137,24 @@ export function useAutoCompile({
     doCompile();
   }, [doCompile]);
 
-  // Debounced auto-compile on data/template changes
+  // Navigate to a specific page
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(page);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    doCompile(page);
+  }, [doCompile]);
+
+  // Debounced auto-compile on data/template changes (resets to page 0)
   useEffect(() => {
     if (!resumeData || !selectedTemplate || selectedTemplate === "uploaded")
       return;
+
+    // Reset to first page on content changes
+    setCurrentPage(0);
+    currentPageRef.current = 0;
 
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -143,7 +162,7 @@ export function useAutoCompile({
 
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
-      doCompile();
+      doCompile(0);
     }, debounceMs);
 
     return () => {
@@ -164,6 +183,7 @@ export function useAutoCompile({
       setPreviewImageUrl(null);
       hasPreviewRef.current = false;
       setPageCount(0);
+      setCurrentPage(0);
       setCompileError(null);
       setLastCompileTime(null);
     }
@@ -183,10 +203,12 @@ export function useAutoCompile({
   return {
     previewImageUrl,
     pageCount,
+    currentPage,
     compiling,
     compileError,
     isRecompiling: compiling && previewImageUrl !== null,
     triggerCompile,
+    goToPage,
     lastCompileTime,
   };
 }
