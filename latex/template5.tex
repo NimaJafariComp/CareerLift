@@ -10,7 +10,8 @@
 \usepackage[absolute]{textpos}
 \usepackage[UKenglish]{babel}
 \usepackage[UKenglish]{isodate}
-\usepackage{fontspec,xltxtra,xunicode}
+\usepackage[T1]{fontenc}
+\usepackage[default]{lato}
 %\usepackage{minipage}
 \usepackage{enumitem}
 
@@ -22,11 +23,7 @@
 \definecolor{headings}{HTML}{6A6A6A}
 \definecolor{subheadings}{HTML}{333333}
 
-\defaultfontfeatures{Mapping=tex-text}
-% Adjust font paths or replace with system fonts as needed
-\setmainfont[Color=primary]{Lato} % fallback: any installed Lato
-\setsansfont[Scale=MatchLowercase,Mapping=tex-text]{Raleway}
-\newcommand{\custombold}[1]{\color{subheadings}\fontspec{Lato}\selectfont #1 \normalfont}
+\newcommand{\custombold}[1]{\color{subheadings}\bfseries #1 \normalfont}
 
 %----------------------------------------------------------------------------------------
 % DATE BLOCK
@@ -36,7 +33,7 @@
 \textblockorigin{0mm}{5mm}
 \newcommand{\lastupdated}{%
   \begin{textblock}{60}(165,0)
-    \color{date}\sffamily\fontsize{8pt}{10pt}\selectfont
+    \color{date}\fontsize{8pt}{10pt}\selectfont
     Last Updated on \today
   \end{textblock}%
 }
@@ -46,11 +43,10 @@
 %----------------------------------------------------------------------------------------
 \newcommand{\namesection}[3]{%
   \centering{%
-    \sffamily
-    \fontspec{Lato}\fontsize{40pt}{10cm}\selectfont #1
-    \fontspec{Lato}\selectfont #2
-  }\\[5pt]
-  \centering{\color{headings}\sffamily\fontsize{11pt}{14pt}\selectfont #3}
+    \fontsize{40pt}{48pt}\selectfont #1
+    \selectfont #2
+  }\mbox{}\\[5pt]
+  \centering{\color{headings}\fontsize{11pt}{14pt}\selectfont #3}
   \noindent\makebox[\linewidth]{\rule{\paperwidth}{0.4pt}}
   \vspace{-15pt}
 }
@@ -193,6 +189,7 @@
 % DOCUMENT
 %----------------------------------------------------------------------------------------
 \begin{document}
+\color{primary}
 
 \lastupdated
 

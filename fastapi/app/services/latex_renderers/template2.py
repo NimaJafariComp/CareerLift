@@ -1,4 +1,4 @@
-"""Renderer for Template 2 - Modern AltaCV (xelatex)."""
+"""Renderer for Template 2 - Modern AltaCV."""
 
 from app.schemas.latex import ResumeData
 from .base import BaseLatexRenderer

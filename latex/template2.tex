@@ -4,9 +4,8 @@
 % Core packages & layout
 %========================
 \usepackage[margin=1cm]{geometry}
-\usepackage{ifxetex,ifluatex}
 \usepackage{xcolor}
-\usepackage{fontawesome}
+\usepackage{fontawesome} % auto-loads fontspec under XeTeX (Tectonic)
 \usepackage{tikz}
 \usepackage[skins]{tcolorbox}
 \usepackage{enumitem}
@@ -17,7 +16,6 @@
 \usepackage{changepage}
 \usepackage[hidelinks,unicode]{hyperref}
 \usepackage{multicol}
-\usepackage{fontspec} % for XeLaTeX/LuaLaTeX fonts
 
 \pagestyle{empty}
 \raggedright
@@ -54,9 +52,9 @@ boxrule=2pt,arc=0pt,boxsep=2pt,left=2pt,right=2pt,top=2pt,bottom=2pt}
 \newcommand{\divider}{\medskip}
 
 %========================
-% Basic fonts
+% Basic fonts (fontspec loaded by fontawesome above)
 %========================
-\setmainfont{TeX Gyre Heros} % or any installed sans font
+\setmainfont{TeX Gyre Heros}
 
 %========================
 % Icon helpers

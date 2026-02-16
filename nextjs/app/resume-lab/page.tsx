@@ -7,6 +7,7 @@ import type { ResumeData, TemplateInfo } from "../../types/resume";
 import {
   graphDataToResumeData,
   createEmptyResumeData,
+  asString,
 } from "../../lib/resumeDataMapper";
 import { useAutoCompile } from "../../hooks/useAutoCompile";
 import TemplateSelector from "../../components/resume-builder/TemplateSelector";
@@ -76,16 +77,6 @@ export default function ResumeLabPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-
-  const asString = (val: any) => {
-    if (val == null) return "";
-    if (typeof val === "string") return val;
-    if (typeof val === "number" || typeof val === "boolean") return String(val);
-    if (typeof val === "object") {
-      return val.name || val.label || val.title || JSON.stringify(val);
-    }
-    return String(val);
-  };
 
   const allowedExtensions = [".txt", ".md", ".pdf", ".doc", ".docx"];
   const API_URL =

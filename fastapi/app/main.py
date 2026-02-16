@@ -7,8 +7,7 @@ from .routers import job as jobs_router
 
 from app.core.config import settings
 from app.core.database import neo4j_db
-from app.services.scraper_service import scraper_service
-from app.routers import career, scraper, resume, ollama, latex
+from app.routers import career, resume, ollama, latex
 
 
 @asynccontextmanager
@@ -18,7 +17,6 @@ async def lifespan(app: FastAPI):
     print("Starting CareerLift Backend...")
     await neo4j_db.connect()
     await neo4j_db.initialize_schema()
-    await scraper_service.initialize()
     print("All services initialized")
 
     yield
@@ -26,7 +24,6 @@ async def lifespan(app: FastAPI):
     # Shutdown
     print("Shutting down CareerLift Backend...")
     await neo4j_db.close()
-    await scraper_service.close()
     print("All services closed")
 
 
@@ -48,7 +45,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(career.router)
-app.include_router(scraper.router)
 app.include_router(jobs_router.router)
 app.include_router(resume.router)
 app.include_router(ollama.router)
@@ -72,7 +68,6 @@ async def health():
         "status": "healthy",
         "services": {
             "neo4j": "connected",
-            "ollama": "available",
-            "playwright": "initialized"
+            "ollama": "available"
         }
     }

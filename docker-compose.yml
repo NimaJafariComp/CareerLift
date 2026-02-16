@@ -26,7 +26,7 @@ services:
       retries: 5
 
   ollama:
-    image: ollama/ollama:latest
+    image: alpine/ollama:latest
     ports:
       - "11434:11434"
     environment:
@@ -46,9 +46,6 @@ services:
     build:
       context: ./fastapi
       dockerfile: Dockerfile
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-    image: fastapi:latest
     ports:
       - "8000:8000"
     environment:
@@ -66,7 +63,6 @@ services:
     volumes:
       - ./fastapi:/app
       - fastapi_cache:/root/.cache
-      - ./fastapi/app/data:/app/app/data
       - /var/run/docker.sock:/var/run/docker.sock
       - ./latex:/app/latex:ro
       - tectonic_cache:/root/.cache/Tectonic
@@ -93,9 +89,6 @@ services:
     build:
       context: ./nextjs
       dockerfile: Dockerfile
-      args:
-        BUILDKIT_INLINE_CACHE: 1
-    image: nextjs:latest
     ports:
       - "3000:3000"
     environment:

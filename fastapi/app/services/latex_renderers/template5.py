@@ -1,4 +1,4 @@
-"""Renderer for Template 5 - Deedy Two-Column (xelatex)."""
+"""Renderer for Template 5 - Deedy Two-Column."""
 
 from app.schemas.latex import ResumeData
 from .base import BaseLatexRenderer
@@ -9,18 +9,12 @@ class Template5Renderer(BaseLatexRenderer):
 
     def render(self, data: ResumeData) -> str:
         tex = self._read_template()
-        # Replace Raleway with Lato (Raleway not available in Docker)
-        tex = tex.replace(
-            r"\setsansfont[Scale=MatchLowercase,Mapping=tex-text]{Raleway}",
-            r"\setsansfont[Scale=MatchLowercase,Mapping=tex-text]{Lato}",
-        )
         # Fix \descript and \location: empty arg followed by \\ causes "no line to end"
         tex = tex.replace(
             r"\selectfont #1\\ \normalfont}",
             r"\selectfont \ifx\relax#1\relax\else#1\\\fi \normalfont}",
         )
         # Fix empty skill lines causing "no line to end" errors
-        # Replace "SkillsLine\\" with conditional that only adds \\ if non-empty
         for cmd in ["ProgSkillsLine", "SoftwareSkillsLine", "LanguageSkillsLine"]:
             tex = tex.replace(
                 f"\\{cmd}\\\\",
@@ -41,6 +35,71 @@ class Template5Renderer(BaseLatexRenderer):
             "    #2\\\\\n    \\sectionsep",
             "    \\ifx\\relax#2\\relax\\else#2\\\\\\fi\n    \\sectionsep",
         )
+
+        # Remove empty sections to save vertical space (prevents page overflow)
+        # Left column: Objective
+        if not data.person.profile:
+            tex = tex.replace(
+                "  % OBJECTIVE\n"
+                "  \\section{Objective}\n"
+                "  \\userObjective\n"
+                "  \\sectionsep\n",
+                "",
+            )
+        # Left column: Links (renderer never injects link data)
+        tex = tex.replace(
+            "\n  % LINKS\n"
+            "  \\section{Links}\n"
+            "  \\LinksList\n"
+            "  \\sectionsep\n",
+            "",
+        )
+        # Left column: Coursework (if no courses)
+        if not data.coursework.postgraduate and not data.coursework.undergraduate:
+            tex = tex.replace(
+                "\n  % COURSEWORK\n"
+                "  \\section{Coursework}\n"
+                "  \\subsection{PostGraduate}\n"
+                "  \\PGCourseworkList\n"
+                "  \\sectionsep\n"
+                "\n"
+                "  \\subsection{Undergraduate}\n"
+                "  \\UGCourseworkList\n"
+                "  \\sectionsep\n",
+                "",
+            )
+        # Left column: Education (if none)
+        if not data.education:
+            tex = tex.replace(
+                "\n  % EDUCATION\n"
+                "  \\section{Education}\n"
+                "  \\EducationList\n",
+                "",
+            )
+        # Right column: Projects (if none)
+        if not data.projects:
+            tex = tex.replace(
+                "\n  % PROJECTS\n"
+                "  \\section{Projects}\n"
+                "  \\ProjectList\n",
+                "",
+            )
+        # Right column: Training (renderer never injects training data)
+        tex = tex.replace(
+            "\n  % TRAINING\n"
+            "  \\section{Training}\n"
+            "  \\TrainingList\n",
+            "",
+        )
+        # Right column: Publication (if none)
+        if not data.publications:
+            tex = tex.replace(
+                "\n  % PUBLICATION\n"
+                "  \\section{Publication}\n"
+                "  \\PublicationList\n",
+                "",
+            )
+
         preamble, body = self._split_at_document(tex)
 
         inject = "\n%=== INJECTED DATA ===\n"
