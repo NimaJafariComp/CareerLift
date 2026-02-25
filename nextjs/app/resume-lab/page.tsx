@@ -3,16 +3,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import axios from "axios";
-import type { ResumeData, TemplateInfo } from "../../types/resume";
+import type { ResumeData, TemplateInfo } from "@/types/resume";
 import {
   graphDataToResumeData,
   createEmptyResumeData,
   asString,
-} from "../../lib/resumeDataMapper";
-import { useAutoCompile } from "../../hooks/useAutoCompile";
-import TemplateSelector from "../../components/resume-builder/TemplateSelector";
-import PdfViewer from "../../components/resume-builder/PdfViewer";
-import ResumeEditor from "../../components/resume-builder/ResumeEditor";
+} from "@/lib/resumeDataMapper";
+import { useAutoCompile } from "@/hooks/useAutoCompile";
+import TemplateSelector from "@/components/resume-builder/TemplateSelector";
+import PdfViewer from "@/components/resume-builder/PdfViewer";
+import ResumeEditor from "@/components/resume-builder/ResumeEditor";
 
 interface GraphData {
   person: {
