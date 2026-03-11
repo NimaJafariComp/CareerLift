@@ -36,7 +36,7 @@ export default function JobSearchForm({
       <div className="flex justify-end">
         <button
           type="submit"
-          className="nav-item nav-item-active !px-4 !py-2 hover:opacity-80"
+          className="jf-btn jf-btn-primary px-4 py-2"
           disabled={loading}
         >
           {loading ? "Searching..." : "Search"}

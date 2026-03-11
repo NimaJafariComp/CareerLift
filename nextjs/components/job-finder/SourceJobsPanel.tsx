@@ -70,7 +70,7 @@ export default function SourceJobsPanel({
           <button
             onClick={() => onRefresh(source.key)}
             disabled={isSourceLoading}
-            className="rounded-lg bg-purple-500/20 px-3 py-1 text-xs text-purple-700 hover:bg-purple-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="jf-btn jf-btn-accent px-3 py-1"
           >
             {isSourceLoading ? "Refreshing..." : "Refresh"}
           </button>
@@ -78,7 +78,7 @@ export default function SourceJobsPanel({
             <button
               onClick={() => onLoadMore(source.key)}
               disabled={isSourceLoading}
-              className="rounded-lg bg-blue-500/20 px-3 py-1 text-xs text-blue-700 hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+              className="jf-btn jf-btn-info px-3 py-1"
             >
               {isSourceLoading ? "Loading..." : "Load More (+100)"}
             </button>
@@ -93,7 +93,7 @@ export default function SourceJobsPanel({
             <button
               onClick={() => onRefresh(source.key)}
               disabled={isSourceLoading}
-              className="rounded-lg bg-purple-500/20 px-3 py-1 text-xs text-purple-300 hover:bg-purple-500/30 disabled:opacity-50"
+              className="jf-btn jf-btn-accent px-3 py-1"
             >
               {isSourceLoading ? "Fetching..." : "Fetch Jobs"}
             </button>
@@ -172,7 +172,7 @@ export default function SourceJobsPanel({
                     {jobUrl && (
                       <a
                         href={jobUrl}
-                        className="rounded-lg bg-blue-500/20 px-2 py-1 text-xs text-blue-700 hover:bg-blue-500/30"
+                        className="jf-btn jf-btn-info px-2 py-1"
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -182,7 +182,7 @@ export default function SourceJobsPanel({
                     <button
                       onClick={() => onCalculateAts(source.key, idx)}
                       disabled={isScoring}
-                      className="rounded-lg bg-indigo-500/20 px-2 py-1 text-xs text-indigo-700 hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="jf-btn jf-btn-accent px-2 py-1"
                       title={
                         !selectedResumeId
                           ? "Select a resume first"
@@ -194,10 +194,10 @@ export default function SourceJobsPanel({
                     <button
                       onClick={() => onAddToGraph(job)}
                       disabled={isAddingToGraph || isAddedToGraph}
-                      className={`rounded-lg px-2 py-1 text-xs ${
+                      className={`px-2 py-1 ${
                         isAddedToGraph
-                          ? "cursor-not-allowed bg-green-100 text-green-700"
-                          : "bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30 disabled:opacity-50"
+                          ? "jf-btn jf-btn-success cursor-not-allowed"
+                          : "jf-btn jf-btn-primary"
                       }`}
                     >
                       {isAddingToGraph
