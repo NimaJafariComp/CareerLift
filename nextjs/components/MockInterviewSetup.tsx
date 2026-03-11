@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listResumes, getSavedJobs, SavedJobInfo } from "@/lib/jobFinderApi";
+import { listResumes, getSavedJobs, SavedJobInfo, asString } from "@/lib/jobFinderApi";
 import type { Resume } from "@/components/job-finder/types";
 
 const ROLE_LEVELS = ["entry", "mid", "senior"];
@@ -90,21 +90,22 @@ export default function MockInterviewSetup({ onStartInterview }: MockInterviewSe
             No resumes found. Please create a resume first.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-2">
+          <select
+            value={selectedResume?.resume_id ?? ""}
+            onChange={(e) => {
+              const resumeId = e.target.value;
+              const resume = resumes.find((r) => r.resume_id === resumeId);
+              setSelectedResume(resume || null);
+            }}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2 bg-white text-slate-800 outline-none hover:opacity-80 focus:border-blue-500 transition-colors"
+          >
+            <option value="">-- Select a resume --</option>
             {resumes.map((resume) => (
-              <button
-                key={resume.resume_id}
-                onClick={() => setSelectedResume(resume)}
-                className="text-left p-4 border-2 rounded-lg transition-all"
-                style={{
-                  borderColor: selectedResume?.resume_id === resume.resume_id ? "#3b82f6" : "#e2e8f0",
-                  backgroundColor: selectedResume?.resume_id === resume.resume_id ? "#eff6ff" : "white",
-                }}
-              >
-                <div className="font-medium text-slate-400">{resume.resume_name}</div>
-              </button>
+              <option key={resume.resume_id} value={resume.resume_id}>
+                {resume.resume_name} ({asString(resume.person_name)})
+              </option>
             ))}
-          </div>
+          </select>
         )}
       </div>
 

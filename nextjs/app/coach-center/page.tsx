@@ -54,12 +54,14 @@ export default function CoachCenterPage() {
                 <MockInterviewSetup onStartInterview={handleStartInterview} />
               ) : (
                 <MockInterview
+                
                   resumeName={interviewSession.resumeName}
                   roleTitle={interviewSession.roleTitle}
                   roleLevel={interviewSession.roleLevel}
                   onComplete={handleInterviewComplete}
                   onReset={handleResetInterview}
                 />
+                
               )}
             </div>
 
