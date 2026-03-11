@@ -148,6 +148,88 @@ class LLMService:
             "resume_text": resume_text
         }, ResumeFeedbackResponse)
 
+    # interview helpers -----------------------------------------------------
+
+    async def generate_interview_question(
+        self,
+        resume_text: str,
+        role_level: str,
+        previous_steps: list[dict[str, str]] | None = None,
+    ) -> "Question":
+        """Produce the next interview question based on resume and role level."""
+        from app.schemas.interview import Question
+
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are an experienced interviewer. "
+                "Given a candidate's resume text and desired role level, generate an appropriate next question. "
+                "Return only valid JSON with key `text`."
+            ),
+            (
+                "human",
+                """
+                Resume:
+                {resume_text}
+
+                Role level: {role_level}
+
+                {history_section}
+
+                Return the next question as JSON.
+            """
+            ),
+        ])
+
+        history_section = ""
+        if previous_steps:
+            entries = []
+            for step in previous_steps:
+                entries.append(f"Q: {step['question']}\nA: {step['answer']}")
+            history_section = "Previous Q/A:\n" + "\n".join(entries)
+
+        variables = {
+            "resume_text": resume_text,
+            "role_level": role_level,
+            "history_section": history_section,
+        }
+
+        result = await self._invoke_structured(prompt, variables, Question)
+        return result
+
+    async def evaluate_interview_answer(
+        self,
+        question: str,
+        answer: str,
+    ) -> "Evaluation":
+        from app.schemas.interview import Evaluation
+
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are a skilled interviewer evaluating candidate answers. "
+                "Return JSON with keys `score` (0-10) and `feedback`."
+            ),
+            (
+                "human",
+                """
+                Question:
+                {question}
+
+                Candidate Answer:
+                {answer}
+
+                Provide a numeric score (0-10) and concise feedback.
+            """
+            ),
+        ])
+
+        return await self._invoke_structured(
+            prompt,
+            {"question": question, "answer": answer},
+            Evaluation,
+        )
+
 
 # Global LLM service instance
 llm_service = LLMService()
