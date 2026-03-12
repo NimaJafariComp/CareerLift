@@ -533,6 +533,7 @@ export default function ResumeLabPage() {
           selected={selectedTemplate}
           onSelect={handleTemplateSelect}
           hasUploadedFile={!!uploadedFileUrl}
+          resumeData={resumeData}
         />
       )}
 
