@@ -102,7 +102,7 @@ services:
       - network
     depends_on:
       - fastapi
-    command: npm run dev
+    command: bun run dev
     develop:
       watch:
         - action: sync
