@@ -1,19 +1,15 @@
 # syntax=docker/dockerfile:1
 
-FROM node:alpine
+FROM oven/bun:alpine
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY package.json bun.lock* ./
 
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
+RUN bun install
 
 COPY . .
 
-RUN chmod +x docker-entrypoint.sh
-
 EXPOSE 3000
 
-ENTRYPOINT ["./docker-entrypoint.sh"]
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]
