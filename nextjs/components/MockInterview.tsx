@@ -12,6 +12,7 @@ import {
 } from "@/lib/interviewApi";
 
 interface MockInterviewProps {
+  resumeId: string;
   resumeName: string;
   roleTitle: string;
   roleLevel: string;
@@ -26,6 +27,7 @@ interface Message {
 }
 
 export default function MockInterview({
+  resumeId,
   resumeName,
   roleTitle,
   roleLevel,
@@ -46,7 +48,7 @@ export default function MockInterview({
     const initializeInterview = async () => {
       try {
         setIsInitializing(true);
-        const response = await startInterview(resumeName, roleLevel);
+        const response = await startInterview(resumeId, roleLevel);
         setSessionId(response.session_id || null);
         if (response.next_question) {
           setCurrentQuestion(response.next_question.text);
@@ -60,7 +62,7 @@ export default function MockInterview({
     };
 
     initializeInterview();
-  }, [resumeName, roleLevel]);
+  }, [resumeId, roleLevel]);
 
   const handleSubmitAnswer = async () => {
     if (!userAnswer.trim() || !sessionId) return;
@@ -91,8 +93,8 @@ export default function MockInterview({
       // Check if interview is complete
       if (response.session_complete) {
         const sessionData = await getInterviewSession(sessionId);
-        setSummary(sessionData);
-        onComplete?.(sessionData);
+        setSummary(sessionData.summary ?? { steps: [] });
+        onComplete?.(sessionData.summary ?? { steps: [] });
       } else if (response.next_question) {
         setCurrentQuestion(response.next_question.text);
       }

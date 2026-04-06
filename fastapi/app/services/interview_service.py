@@ -16,17 +16,19 @@ from app.schemas.interview import (
 class InterviewService:
     MAX_QUESTIONS = 5
 
-    async def start_session(self, db, resume_name: str, role_level: str) -> InterviewResponse:
+    async def start_session(self, db, resume_id: str, role_level: str) -> InterviewResponse:
         # lookup resume text
         query = """
-        MATCH (r:Resume {name: $name})
-        RETURN r.text AS text
+        MATCH (r:Resume {id: $resume_id})
+        RETURN r.id AS resume_id, r.name AS resume_name, r.text AS text
         LIMIT 1
         """
-        result = await db.run(query, name=resume_name)
+        result = await db.run(query, resume_id=resume_id)
         record = await result.single()
         if not record or not record.get("text"):
-            raise ValueError(f"Resume not found for name: {resume_name}")
+            raise ValueError(f"Resume not found for id: {resume_id}")
+        resolved_resume_id = record["resume_id"]
+        resume_name = record["resume_name"]
         resume_text = record["text"]
 
         # ask LLM for first question
@@ -41,6 +43,7 @@ class InterviewService:
         create_query = """
         CREATE (s:InterviewSession {
             session_id: $session_id,
+            resume_id: $resume_id,
             resume_name: $resume_name,
             role_level: $role_level,
             started_at: datetime($started_at)
@@ -49,6 +52,7 @@ class InterviewService:
         await db.run(
             create_query,
             session_id=session_id,
+            resume_id=resolved_resume_id,
             resume_name=resume_name,
             role_level=role_level,
             started_at=now_iso,
@@ -126,16 +130,17 @@ class InterviewService:
         ]
         meta_query = """
         MATCH (s:InterviewSession {session_id: $session_id})
-        RETURN s.resume_name AS resume_name, s.role_level AS role_level
+        RETURN s.resume_id AS resume_id, s.resume_name AS resume_name, s.role_level AS role_level
         LIMIT 1
         """
         meta_res = await db.run(meta_query, session_id=session_id)
         meta = await meta_res.single()
+        resume_id = meta["resume_id"]
         resume_name = meta["resume_name"]
         role_level = meta["role_level"]
         text_res = await db.run(
-            "MATCH (r:Resume {name: $name}) RETURN r.text AS text LIMIT 1",
-            name=resume_name,
+            "MATCH (r:Resume {id: $resume_id}) RETURN r.text AS text LIMIT 1",
+            resume_id=resume_id,
         )
         text_record = await text_res.single()
         resume_text = text_record["text"] if text_record else ""
@@ -209,6 +214,7 @@ class InterviewService:
             )
         return InterviewSession(
             session_id=snode.get("session_id"),
+            resume_id=snode.get("resume_id"),
             resume_name=snode.get("resume_name"),
             role_level=snode.get("role_level"),
             started_at=snode.get("started_at"),

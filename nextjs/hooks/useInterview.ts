@@ -7,6 +7,7 @@ import {
   getInterviewSession,
   InterviewResponse,
   SessionSummary,
+  InterviewSession,
 } from "@/lib/interviewApi";
 
 const STORAGE_KEY = "careerlift:interview";
@@ -17,8 +18,9 @@ interface Message {
   evaluation?: string;
 }
 
-interface PersistedState {
+  interface PersistedState {
   sessionId?: string;
+  resumeId?: string;
   resumeName?: string;
   roleLevel?: string;
   messages: Message[];
@@ -46,6 +48,7 @@ function savePersisted(state: PersistedState) {
 
 export function useInterview() {
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [resumeId, setResumeId] = useState<string>("");
   const [resumeName, setResumeName] = useState<string>("");
   const [roleLevel, setRoleLevel] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -57,6 +60,7 @@ export function useInterview() {
     loadedRef.current = true;
     const p = loadPersisted();
     setSessionId(p.sessionId || null);
+    if (p.resumeId) setResumeId(p.resumeId);
     if (p.resumeName) setResumeName(p.resumeName);
     if (p.roleLevel) setRoleLevel(p.roleLevel);
     setMessages(p.messages || []);
@@ -64,12 +68,13 @@ export function useInterview() {
   }, []);
 
   useEffect(() => {
-    savePersisted({ sessionId: sessionId || undefined, resumeName, roleLevel, messages, summary: summary || undefined });
-  }, [sessionId, resumeName, roleLevel, messages, summary]);
+    savePersisted({ sessionId: sessionId || undefined, resumeId: resumeId || undefined, resumeName, roleLevel, messages, summary: summary || undefined });
+  }, [sessionId, resumeId, resumeName, roleLevel, messages, summary]);
 
-  const start = async (name: string, level: string) => {
-    const resp: InterviewResponse = await startInterview(name, level);
+  const start = async (id: string, name: string, level: string) => {
+    const resp: InterviewResponse = await startInterview(id, level);
     setSessionId(resp.session_id || null);
+    setResumeId(id);
     setResumeName(name);
     setRoleLevel(level);
     const msg: Message = {};
@@ -100,13 +105,15 @@ export function useInterview() {
   };
 
   const loadSessionData = async (id: string) => {
-    const data = await getInterviewSession(id);
-    setSummary(data);
+    const data: InterviewSession = await getInterviewSession(id);
+    setSummary(data.summary ?? null);
     setSessionId(id);
+    setResumeId(data.resume_id);
   };
 
   return {
     sessionId,
+    resumeId,
     resumeName,
     setResumeName,
     roleLevel,

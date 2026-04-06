@@ -12,7 +12,7 @@ def test_start_interview_endpoint(monkeypatch):
     dummy_resp = InterviewResponse(next_question=Question(text="What is your name?"), session_id="sess123")
     monkeypatch.setattr(interview_service, "start_session", lambda db, rn, rl: dummy_resp)
 
-    response = client.post("/api/interview/start", json={"resume_name": "foo", "role_level": "entry"})
+    response = client.post("/api/interview/start", json={"resume_id": "resume-123", "role_level": "entry"})
     assert response.status_code == 200
     body = response.json()
     assert body["session_id"] == "sess123"
@@ -37,6 +37,7 @@ def test_respond_interview_endpoint(monkeypatch):
 def test_get_session_endpoint(monkeypatch):
     dummy_session = {
         "session_id": "sess123",
+        "resume_id": "resume-123",
         "resume_name": "foo",
         "role_level": "entry",
         "started_at": "2026-03-11T00:00:00",
@@ -50,5 +51,6 @@ def test_get_session_endpoint(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["session_id"] == "sess123"
+    assert body["resume_id"] == "resume-123"
     assert body["resume_name"] == "foo"
     assert body["role_level"] == "entry"

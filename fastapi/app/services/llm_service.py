@@ -1,6 +1,7 @@
 """LLM service using LangChain and Ollama."""
 
 import json
+import logging
 from typing import Any, Type, TypeVar
 
 from langchain_ollama import OllamaLLM
@@ -17,6 +18,7 @@ from app.schemas.llm import (
 
 
 T = TypeVar("T", bound=BaseModel)
+logger = logging.getLogger(__name__)
 
 
 class LLMOutputError(ValueError):
@@ -34,6 +36,39 @@ class LLMService:
         )
         self.parser = StrOutputParser()
 
+    @staticmethod
+    def _extract_json_payload(response: str) -> Any:
+        """Parse JSON directly or recover it from mixed model output."""
+        cleaned = response.strip()
+        if not cleaned:
+            raise json.JSONDecodeError("Empty response", cleaned, 0)
+
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            pass
+
+        # Handle fenced code blocks such as ```json ... ```
+        if "```" in cleaned:
+            segments = cleaned.split("```")
+            for segment in segments:
+                candidate = segment.strip()
+                if not candidate:
+                    continue
+                if candidate.lower().startswith("json"):
+                    candidate = candidate[4:].strip()
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    continue
+
+        json_start = cleaned.find("{")
+        json_end = cleaned.rfind("}") + 1
+        if json_start >= 0 and json_end > json_start:
+            return json.loads(cleaned[json_start:json_end])
+
+        raise json.JSONDecodeError("No JSON object found", cleaned, 0)
+
     async def _invoke_structured(
         self,
         prompt: ChatPromptTemplate,
@@ -45,13 +80,26 @@ class LLMService:
         response = await chain.ainvoke(variables)
 
         try:
-            payload = json.loads(response)
+            payload = self._extract_json_payload(response)
         except json.JSONDecodeError as exc:
+            preview = response.strip().replace("\n", "\\n")[:500]
+            logger.warning("Structured LLM response was not valid JSON: %s", preview)
+
+            # Interview questions are simple enough to recover from plain text.
+            if response_model.__name__ == "Question":
+                fallback_text = response.strip().strip("`").strip()
+                if fallback_text:
+                    return response_model.model_validate({"text": fallback_text})
             raise LLMOutputError("LLM returned invalid JSON") from exc
 
         try:
             return response_model.model_validate(payload)
         except ValidationError as exc:
+            logger.warning(
+                "Structured LLM response had unexpected shape for %s: %s",
+                response_model.__name__,
+                str(payload)[:500],
+            )
             raise LLMOutputError("LLM returned an unexpected response shape") from exc
 
     async def generate_career_advice(

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/interview", tags=["interview"])
 @router.post("/start", response_model=InterviewResponse)
 async def start_interview(request: InterviewStartRequest, db=Depends(get_db)):
     try:
-        return await interview_service.start_session(db, request.resume_name, request.role_level)
+        return await interview_service.start_session(db, request.resume_id, request.role_level)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
