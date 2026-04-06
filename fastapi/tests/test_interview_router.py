@@ -10,9 +10,16 @@ client = TestClient(app)
 
 def test_start_interview_endpoint(monkeypatch):
     dummy_resp = InterviewResponse(next_question=Question(text="What is your name?"), session_id="sess123")
-    monkeypatch.setattr(interview_service, "start_session", lambda db, rn, rl: dummy_resp)
+    monkeypatch.setattr(interview_service, "start_session", lambda db, rid, job_url, rl: dummy_resp)
 
-    response = client.post("/api/interview/start", json={"resume_id": "resume-123", "role_level": "entry"})
+    response = client.post(
+        "/api/interview/start",
+        json={
+            "resume_id": "resume-123",
+            "job_apply_url": "https://example.com/job",
+            "role_level": "entry",
+        },
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["session_id"] == "sess123"
@@ -39,6 +46,11 @@ def test_get_session_endpoint(monkeypatch):
         "session_id": "sess123",
         "resume_id": "resume-123",
         "resume_name": "foo",
+        "job_apply_url": "https://example.com/job",
+        "job_title": "Backend Engineer",
+        "job_company": "Acme",
+        "job_requirements": ["python", "fastapi"],
+        "job_responsibilities": ["apis"],
         "role_level": "entry",
         "started_at": "2026-03-11T00:00:00",
         "completed_at": None,
@@ -52,5 +64,6 @@ def test_get_session_endpoint(monkeypatch):
     body = response.json()
     assert body["session_id"] == "sess123"
     assert body["resume_id"] == "resume-123"
+    assert body["job_apply_url"] == "https://example.com/job"
     assert body["resume_name"] == "foo"
     assert body["role_level"] == "entry"

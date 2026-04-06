@@ -7,7 +7,13 @@ import type { Resume } from "@/components/job-finder/types";
 const ROLE_LEVELS = ["entry", "mid", "senior"];
 
 interface MockInterviewSetupProps {
-  onStartInterview?: (resumeId: string, resumeName: string, roleTitle: string, level: string) => void;
+  onStartInterview?: (
+    resumeId: string,
+    resumeName: string,
+    jobApplyUrl: string,
+    roleTitle: string,
+    level: string
+  ) => void;
 }
 
 export default function MockInterviewSetup({ onStartInterview }: MockInterviewSetupProps) {
@@ -70,6 +76,7 @@ export default function MockInterviewSetup({ onStartInterview }: MockInterviewSe
     onStartInterview?.(
       selectedResume.resume_id,
       selectedResume.resume_name,
+      selectedJob.apply_url,
       selectedJob.job_title,
       selectedLevel
     );

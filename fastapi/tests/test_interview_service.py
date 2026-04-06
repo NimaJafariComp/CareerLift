@@ -29,14 +29,30 @@ class DummyDB:
 
     async def run(self, query, **kwargs):
         self.calls.append((query, kwargs))
-        if "MATCH (r:Resume" in query and "RETURN r.text" in query:
+        if "MATCH (r:Resume" in query and "RETURN r.id AS resume_id" in query:
             return DummyResult({"resume_id": "resume-123", "resume_name": "myresume", "text": "dummy resume text"})
+        if "MATCH (r:Resume {id: $resume_id})-[:SAVED_JOB]->(j:JobPosting" in query:
+            return DummyResult({
+                "apply_url": "https://example.com/job",
+                "title": "Backend Engineer",
+                "company": "Acme",
+                "location": "Remote",
+                "description": "Build APIs with Python and FastAPI. Required: Python, FastAPI. Bonus: Docker.",
+                "source": "remotive",
+            })
         if "RETURN st.question" in query and "ORDER BY" in query:
             return DummyResult([
                 {"question": "Q1", "answer": "A1", "score": 5, "feedback": "ok", "ts": datetime.utcnow()}
             ])
         if "RETURN s.resume_id" in query:
-            return DummyResult({"resume_id": "resume-123", "resume_name": "myresume", "role_level": "entry"})
+            return DummyResult({
+                "resume_id": "resume-123",
+                "resume_name": "myresume",
+                "role_level": "entry",
+                "job_apply_url": "https://example.com/job",
+            })
+        if "MATCH (r:Resume {id: $resume_id}) RETURN r.text AS text LIMIT 1" in query:
+            return DummyResult({"text": "dummy resume text"})
         return DummyResult({})
 
 
@@ -44,17 +60,22 @@ class DummyDB:
 async def test_start_and_submit():
     db = DummyDB()
 
-    async def fake_question(resume_text, role_level, previous_steps=None):
+    async def fake_question(resume_text, role_level, job_context, previous_steps=None):
         return Question(text="What is 2+2?")
 
-    async def fake_eval(question, answer):
+    async def fake_eval(question, answer, role_level, resume_text, job_context):
         return Evaluation(score=9.0, feedback="Great")
 
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(llm_service, "generate_interview_question", fake_question)
     monkeypatch.setattr(llm_service, "evaluate_interview_answer", fake_eval)
 
-    resp: InterviewResponse = await interview_service.start_session(db, "resume-123", "entry")
+    resp: InterviewResponse = await interview_service.start_session(
+        db,
+        "resume-123",
+        "https://example.com/job",
+        "entry",
+    )
     assert resp.session_id is not None
     assert resp.next_question.text == "What is 2+2?"
 

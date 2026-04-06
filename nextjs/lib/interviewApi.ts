@@ -20,6 +20,11 @@ export type InterviewSession = {
   session_id: string;
   resume_id: string;
   resume_name: string;
+  job_apply_url: string;
+  job_title?: string | null;
+  job_company?: string | null;
+  job_requirements?: string[];
+  job_responsibilities?: string[];
   role_level: string;
   started_at: string;
   completed_at?: string | null;
@@ -41,12 +46,20 @@ export type SessionSummary = {
 
 import { getApiBase } from "./jobFinderApi";
 
-export async function startInterview(resumeId: string, roleLevel: string): Promise<InterviewResponse> {
+export async function startInterview(
+  resumeId: string,
+  jobApplyUrl: string,
+  roleLevel: string
+): Promise<InterviewResponse> {
   const base = getApiBase();
   const res = await fetch(`${base}/api/interview/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ resume_id: resumeId, role_level: roleLevel }),
+    body: JSON.stringify({
+      resume_id: resumeId,
+      job_apply_url: jobApplyUrl,
+      role_level: roleLevel,
+    }),
   });
   if (!res.ok) throw new Error(`Failed to start interview: ${res.status}`);
   return res.json();

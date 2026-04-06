@@ -14,6 +14,7 @@ import {
 interface MockInterviewProps {
   resumeId: string;
   resumeName: string;
+  jobApplyUrl: string;
   roleTitle: string;
   roleLevel: string;
   onComplete?: (summary: SessionSummary) => void;
@@ -29,6 +30,7 @@ interface Message {
 export default function MockInterview({
   resumeId,
   resumeName,
+  jobApplyUrl,
   roleTitle,
   roleLevel,
   onComplete,
@@ -48,7 +50,7 @@ export default function MockInterview({
     const initializeInterview = async () => {
       try {
         setIsInitializing(true);
-        const response = await startInterview(resumeId, roleLevel);
+        const response = await startInterview(resumeId, jobApplyUrl, roleLevel);
         setSessionId(response.session_id || null);
         if (response.next_question) {
           setCurrentQuestion(response.next_question.text);
@@ -62,7 +64,7 @@ export default function MockInterview({
     };
 
     initializeInterview();
-  }, [resumeId, roleLevel]);
+  }, [resumeId, jobApplyUrl, roleLevel]);
 
   const handleSubmitAnswer = async () => {
     if (!userAnswer.trim() || !sessionId) return;

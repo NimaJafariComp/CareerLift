@@ -5,6 +5,7 @@ from datetime import datetime
 
 class InterviewStartRequest(BaseModel):
     resume_id: str
+    job_apply_url: str
     role_level: str = Field(..., description="Desired experience level (e.g. entry, mid, senior)")
 
 
@@ -43,6 +44,11 @@ class InterviewSession(BaseModel):
     session_id: str
     resume_id: str
     resume_name: str
+    job_apply_url: str
+    job_title: Optional[str] = None
+    job_company: Optional[str] = None
+    job_requirements: List[str] = Field(default_factory=list)
+    job_responsibilities: List[str] = Field(default_factory=list)
     role_level: str
     started_at: datetime
     completed_at: Optional[datetime] = None

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
+from app.services.ats_service import ats_service
 from app.services.llm_service import llm_service
 from app.schemas.interview import (
     InterviewResponse,
@@ -16,7 +17,48 @@ from app.schemas.interview import (
 class InterviewService:
     MAX_QUESTIONS = 5
 
-    async def start_session(self, db, resume_id: str, role_level: str) -> InterviewResponse:
+    async def _get_job_context(self, db, resume_id: str, job_apply_url: str) -> dict:
+        query = """
+        MATCH (r:Resume {id: $resume_id})-[:SAVED_JOB]->(j:JobPosting {apply_url: $job_apply_url})
+        RETURN j.apply_url AS apply_url,
+               j.title AS title,
+               j.company AS company,
+               j.location AS location,
+               j.description AS description,
+               j.source AS source
+        LIMIT 1
+        """
+        result = await db.run(query, resume_id=resume_id, job_apply_url=job_apply_url)
+        record = await result.single()
+        if not record:
+            raise ValueError("Saved job not found for this resume")
+
+        job_data = {
+            "apply_url": record["apply_url"],
+            "title": record.get("title") or "Target role",
+            "company": record.get("company"),
+            "location": record.get("location"),
+            "description": record.get("description") or "",
+            "source": record.get("source"),
+        }
+        requirements = ats_service.extract_job_requirements(job_data)
+        return {
+            **job_data,
+            "required_skills": requirements["required_skills"],
+            "preferred_skills": requirements["preferred_skills"],
+            "responsibility_keywords": requirements["responsibility_keywords"],
+            "seniority": requirements["seniority"],
+            "years_required": requirements["years_required"],
+            "degree_required": requirements["degree_required"],
+        }
+
+    async def start_session(
+        self,
+        db,
+        resume_id: str,
+        job_apply_url: str,
+        role_level: str,
+    ) -> InterviewResponse:
         # lookup resume text
         query = """
         MATCH (r:Resume {id: $resume_id})
@@ -30,11 +72,13 @@ class InterviewService:
         resolved_resume_id = record["resume_id"]
         resume_name = record["resume_name"]
         resume_text = record["text"]
+        job_context = await self._get_job_context(db, resolved_resume_id, job_apply_url)
 
         # ask LLM for first question
         question = await llm_service.generate_interview_question(
             resume_text=resume_text,
             role_level=role_level,
+            job_context=job_context,
             previous_steps=None,
         )
 
@@ -45,6 +89,11 @@ class InterviewService:
             session_id: $session_id,
             resume_id: $resume_id,
             resume_name: $resume_name,
+            job_apply_url: $job_apply_url,
+            job_title: $job_title,
+            job_company: $job_company,
+            job_requirements: $job_requirements,
+            job_responsibilities: $job_responsibilities,
             role_level: $role_level,
             started_at: datetime($started_at)
         })
@@ -54,6 +103,11 @@ class InterviewService:
             session_id=session_id,
             resume_id=resolved_resume_id,
             resume_name=resume_name,
+            job_apply_url=job_context["apply_url"],
+            job_title=job_context["title"],
+            job_company=job_context.get("company"),
+            job_requirements=job_context["required_skills"] + job_context["preferred_skills"],
+            job_responsibilities=job_context["responsibility_keywords"],
             role_level=role_level,
             started_at=now_iso,
         )
@@ -93,8 +147,37 @@ class InterviewService:
         last_step = records[-1]
         question_text = last_step["question"]
 
+        meta_query = """
+        MATCH (s:InterviewSession {session_id: $session_id})
+        RETURN s.resume_id AS resume_id,
+               s.resume_name AS resume_name,
+               s.role_level AS role_level,
+               s.job_apply_url AS job_apply_url
+        LIMIT 1
+        """
+        meta_res = await db.run(meta_query, session_id=session_id)
+        meta = await meta_res.single()
+        if not meta:
+            raise ValueError("Session metadata not found")
+        resume_id = meta["resume_id"]
+        resume_name = meta["resume_name"]
+        role_level = meta["role_level"]
+        job_apply_url = meta["job_apply_url"]
+
+        text_res = await db.run(
+            "MATCH (r:Resume {id: $resume_id}) RETURN r.text AS text LIMIT 1",
+            resume_id=resume_id,
+        )
+        text_record = await text_res.single()
+        resume_text = text_record["text"] if text_record else ""
+        job_context = await self._get_job_context(db, resume_id, job_apply_url)
+
         evaluation = await llm_service.evaluate_interview_answer(
-            question_text, answer
+            question_text,
+            answer,
+            role_level=role_level,
+            resume_text=resume_text,
+            job_context=job_context,
         )
 
         update_query = """
@@ -128,26 +211,10 @@ class InterviewService:
             {"question": rec["question"], "answer": rec.get("answer") or ""}
             for rec in records
         ]
-        meta_query = """
-        MATCH (s:InterviewSession {session_id: $session_id})
-        RETURN s.resume_id AS resume_id, s.resume_name AS resume_name, s.role_level AS role_level
-        LIMIT 1
-        """
-        meta_res = await db.run(meta_query, session_id=session_id)
-        meta = await meta_res.single()
-        resume_id = meta["resume_id"]
-        resume_name = meta["resume_name"]
-        role_level = meta["role_level"]
-        text_res = await db.run(
-            "MATCH (r:Resume {id: $resume_id}) RETURN r.text AS text LIMIT 1",
-            resume_id=resume_id,
-        )
-        text_record = await text_res.single()
-        resume_text = text_record["text"] if text_record else ""
-
         next_question = await llm_service.generate_interview_question(
             resume_text=resume_text,
             role_level=role_level,
+            job_context=job_context,
             previous_steps=history_steps,
         )
 
@@ -216,6 +283,11 @@ class InterviewService:
             session_id=snode.get("session_id"),
             resume_id=snode.get("resume_id"),
             resume_name=snode.get("resume_name"),
+            job_apply_url=snode.get("job_apply_url"),
+            job_title=snode.get("job_title"),
+            job_company=snode.get("job_company"),
+            job_requirements=snode.get("job_requirements") or [],
+            job_responsibilities=snode.get("job_responsibilities") or [],
             role_level=snode.get("role_level"),
             started_at=snode.get("started_at"),
             completed_at=snode.get("completed_at"),

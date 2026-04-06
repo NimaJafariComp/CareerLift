@@ -202,16 +202,18 @@ class LLMService:
         self,
         resume_text: str,
         role_level: str,
+        job_context: dict[str, Any],
         previous_steps: list[dict[str, str]] | None = None,
     ) -> "Question":
-        """Produce the next interview question based on resume and role level."""
+        """Produce the next interview question based on resume, job context, and role level."""
         from app.schemas.interview import Question
 
         prompt = ChatPromptTemplate.from_messages([
             (
                 "system",
                 "You are an experienced interviewer. "
-                "Given a candidate's resume text and desired role level, generate an appropriate next question. "
+                "Given a candidate's resume text, target job context, and desired role level, generate an appropriate next question. "
+                "Tailor the question to the selected role, required skills, and responsibilities. "
                 "Return only valid JSON with key `text`."
             ),
             (
@@ -220,11 +222,20 @@ class LLMService:
                 Resume:
                 {resume_text}
 
+                Target job title: {job_title}
+                Company: {job_company}
+                Job description:
+                {job_description}
+
+                Required skills: {required_skills}
+                Preferred skills: {preferred_skills}
+                Key responsibilities: {responsibility_keywords}
+
                 Role level: {role_level}
 
                 {history_section}
 
-                Return the next question as JSON.
+                Return the next question as JSON. Ask something that helps assess fit for this specific role.
             """
             ),
         ])
@@ -238,6 +249,12 @@ class LLMService:
 
         variables = {
             "resume_text": resume_text,
+            "job_title": job_context.get("title") or "Target role",
+            "job_company": job_context.get("company") or "Unknown company",
+            "job_description": job_context.get("description") or "No job description available.",
+            "required_skills": ", ".join(job_context.get("required_skills") or []) or "None listed",
+            "preferred_skills": ", ".join(job_context.get("preferred_skills") or []) or "None listed",
+            "responsibility_keywords": ", ".join(job_context.get("responsibility_keywords") or []) or "None listed",
             "role_level": role_level,
             "history_section": history_section,
         }
@@ -249,6 +266,9 @@ class LLMService:
         self,
         question: str,
         answer: str,
+        role_level: str,
+        resume_text: str,
+        job_context: dict[str, Any],
     ) -> "Evaluation":
         from app.schemas.interview import Evaluation
 
@@ -256,11 +276,25 @@ class LLMService:
             (
                 "system",
                 "You are a skilled interviewer evaluating candidate answers. "
+                "Evaluate the answer against the selected job, the asked question, and the candidate resume. "
                 "Return JSON with keys `score` (0-10) and `feedback`."
             ),
             (
                 "human",
                 """
+                Target job title: {job_title}
+                Company: {job_company}
+                Job description:
+                {job_description}
+
+                Required skills: {required_skills}
+                Preferred skills: {preferred_skills}
+                Key responsibilities: {responsibility_keywords}
+                Role level: {role_level}
+
+                Candidate Resume:
+                {resume_text}
+
                 Question:
                 {question}
 
@@ -268,13 +302,26 @@ class LLMService:
                 {answer}
 
                 Provide a numeric score (0-10) and concise feedback.
+                Reward answers that clearly connect resume experience to this specific role.
+                Penalize generic or role-mismatched answers.
             """
             ),
         ])
 
         return await self._invoke_structured(
             prompt,
-            {"question": question, "answer": answer},
+            {
+                "job_title": job_context.get("title") or "Target role",
+                "job_company": job_context.get("company") or "Unknown company",
+                "job_description": job_context.get("description") or "No job description available.",
+                "required_skills": ", ".join(job_context.get("required_skills") or []) or "None listed",
+                "preferred_skills": ", ".join(job_context.get("preferred_skills") or []) or "None listed",
+                "responsibility_keywords": ", ".join(job_context.get("responsibility_keywords") or []) or "None listed",
+                "role_level": role_level,
+                "resume_text": resume_text,
+                "question": question,
+                "answer": answer,
+            },
             Evaluation,
         )
 
