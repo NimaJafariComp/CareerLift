@@ -44,7 +44,7 @@ class LLMService:
             return text
         return text[: limit - 3].rstrip() + "..."
 
-    @classmethod
+    @staticmethod
     def _extract_json_payload(response: str) -> Any:
         """Parse JSON directly or recover it from mixed model output."""
         cleaned = response.strip()
