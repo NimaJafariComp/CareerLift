@@ -64,7 +64,7 @@ services:
       - ./fastapi:/app
       - fastapi_cache:/root/.cache
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./latex:/app/latex:ro
+      - ./latex:/latex:ro
       - tectonic_cache:/root/.cache/Tectonic
     networks:
       - network
