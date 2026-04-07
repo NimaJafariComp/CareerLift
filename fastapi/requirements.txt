@@ -13,9 +13,6 @@ langchain-community
 langchain-core
 langchain-ollama
 
-# Playwright
-playwright
-
 # HTTP Client
 httpx
 aiohttp
@@ -30,6 +27,7 @@ python-multipart
 # Document Processing
 pypdf
 python-docx
+pymupdf
 
 # Testing
 pytest

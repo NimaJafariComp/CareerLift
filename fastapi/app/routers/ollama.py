@@ -9,6 +9,17 @@ import re
 
 router = APIRouter(prefix="/api/ollama", tags=["ollama"])
 
+OLLAMA_CONTAINER_LABELS = {"com.docker.compose.service": "ollama"}
+
+
+def _get_ollama_container():
+    """Find the Ollama container by compose service label."""
+    client = docker.from_env()
+    containers = client.containers.list(filters={"label": ["com.docker.compose.service=ollama"]})
+    if not containers:
+        raise HTTPException(status_code=404, detail="Ollama container not found")
+    return containers[0]
+
 
 @router.get("/status")
 async def get_ollama_status():
@@ -91,14 +102,7 @@ async def signin_ollama():
     they should call the /pull endpoint to download the model.
     """
     try:
-        # Connect to Docker daemon
-        client = docker.from_env()
-
-        # Get the Ollama container
-        try:
-            container = client.containers.get("ollama")
-        except docker.errors.NotFound:
-            raise HTTPException(status_code=404, detail="Ollama container not found")
+        container = _get_ollama_container()
 
         # First, sign out to clear existing authentication
         def run_signout():
@@ -155,17 +159,18 @@ async def pull_model():
     The model pull happens in the background and may take some time.
     """
     try:
-        # Connect to Docker daemon
-        client = docker.from_env()
-
-        # Get the Ollama container
-        try:
-            container = client.containers.get("ollama")
-        except docker.errors.NotFound:
-            raise HTTPException(status_code=404, detail="Ollama container not found")
+        container = _get_ollama_container()
 
         # Get the model name from settings
-        model_name = settings.ollama_model
+        model_name = settings.ollama_model.strip()
+        if not model_name:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "OLLAMA_MODEL is not configured. Set it in your .env file or "
+                    "restart Docker so the compose default is applied."
+                ),
+            )
 
         # Run 'ollama pull <model>' command
         def run_pull():
@@ -188,6 +193,8 @@ async def pull_model():
                 detail=f"Failed to pull model. Exit code: {exit_code}, Output: {stdout}, Error: {stderr}"
             )
 
+    except HTTPException:
+        raise
     except docker.errors.DockerException as e:
         raise HTTPException(status_code=500, detail=f"Docker error: {str(e)}")
     except Exception as e:

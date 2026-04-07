@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import List, Dict, Any, Literal
 import asyncio
-from app.services.playwright import discover_links, extract_jobs_from_url
 from app.services.job_sources import (
     USAJobsClient,
     AdzunaClient,
@@ -10,57 +9,8 @@ from app.services.job_sources import (
 )
 from app.core.config import settings
 
-COMMON_SOURCES = [
-    # Major ATS / job-board hosts (generic):
-    # "https://careers.icims.com/",
-    # company career roots that don't use the above:
-    "https://stripe.com/jobs",
-    # "https://openai.com/careers",
-]
+JobSourceType = Literal["usajobs", "adzuna", "remotive", "weworkremotely"]
 
-JobSourceType = Literal["usajobs", "adzuna", "remotive", "weworkremotely", "scraped"]
-
-# Changeable constant
-JOBS_INGEST_LIMIT = 30
-
-
-async def ingest_from_seeds(db, seed_urls: list[str], max_jobs: int | None = None) -> int:
-    """
-    db is your async Neo4j session from get_db().
-    Returns count of NEW job nodes created (updates not counted).
-    Stops early once limit is reached.
-    """
-    limit = max_jobs if (max_jobs is not None and max_jobs > 0) else JOBS_INGEST_LIMIT
-
-    seen_urls: set[str] = set()
-    created_total = 0
-
-    for seed in seed_urls:
-        links = await asyncio.to_thread(discover_links, seed)
-        for url in links:
-            if url in seen_urls:
-                continue
-            seen_urls.add(url)
-
-            # bail early if we already hit limit
-            if created_total >= limit:
-                return created_total
-
-            jobs = await asyncio.to_thread(extract_jobs_from_url, url)
-            for job in jobs:
-                # If you want to limit by "attempted", uncomment:
-                # seen_jobs += 1
-                # if seen_jobs > limit: return created_total
-
-                if created_total >= limit:
-                    return created_total
-
-                created_total += await _upsert_job(db, job)
-
-                if created_total >= limit:
-                    return created_total
-
-    return created_total
 
 async def ingest_from_usajobs(
     db,

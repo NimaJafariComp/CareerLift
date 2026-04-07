@@ -1,23 +1,15 @@
-# syntax=docker/dockerfile:latest
-FROM node:latest
+# syntax=docker/dockerfile:1
+
+FROM oven/bun:alpine
 
 WORKDIR /app
 
-# Update npm to latest version
-RUN npm install -g npm@latest
+COPY package.json bun.lock* ./
 
-# Copy package files
-COPY package*.json ./
+RUN bun install
 
-# Install dependencies with cache mount
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
-
-# Copy application files
 COPY . .
 
-# Expose port
 EXPOSE 3000
 
-# Default to dev mode
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]

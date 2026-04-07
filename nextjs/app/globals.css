@@ -30,11 +30,12 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Scrollbar (Webkit) */
-body::-webkit-scrollbar { width: 10px; }
-body::-webkit-scrollbar-track { background: #0b0f17; }
-body::-webkit-scrollbar-thumb { background: #1f2b3a; border-radius: 20px; }
-body::-webkit-scrollbar-thumb:hover { background: #22394d; }
+/* Scrollbar — unified style for body + .styled-scrollbar */
+body, .styled-scrollbar { scrollbar-color: #1f2b3a #0b0f17; scrollbar-width: auto; }
+body::-webkit-scrollbar, .styled-scrollbar::-webkit-scrollbar { width: 10px; }
+body::-webkit-scrollbar-track, .styled-scrollbar::-webkit-scrollbar-track { background: #0b0f17; }
+body::-webkit-scrollbar-thumb, .styled-scrollbar::-webkit-scrollbar-thumb { background: #1f2b3a; border-radius: 20px; }
+body::-webkit-scrollbar-thumb:hover, .styled-scrollbar::-webkit-scrollbar-thumb:hover { background: #22394d; }
 
 /* Layout helpers */
 .app-bg { background: var(--background-gradient), var(--background); }
@@ -172,6 +173,30 @@ html {
   --danger: #dc2626;
 }
 
+/* light-mode scrollbar colours */
+:root[data-theme="light"] body,
+:root[data-theme="light"] .styled-scrollbar {
+  scrollbar-color: #c1c1c1 #ffffff;
+  scrollbar-width: auto;
+}
+:root[data-theme="light"] body::-webkit-scrollbar,
+:root[data-theme="light"] .styled-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+:root[data-theme="light"] body::-webkit-scrollbar-track,
+:root[data-theme="light"] .styled-scrollbar::-webkit-scrollbar-track {
+  background: #ffffff;
+}
+:root[data-theme="light"] body::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .styled-scrollbar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 20px;
+}
+:root[data-theme="light"] body::-webkit-scrollbar-thumb:hover,
+:root[data-theme="light"] .styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
 /* utility tokens used in existing UI */
 :root[data-theme="light"] .nav-item {
   background: #ffffff;
@@ -295,16 +320,144 @@ html {
   /* dark theme: keep subtle, bias toward accent slightly */
   --panel-bg: color-mix(in oklab, var(--background-alt) 85%, var(--accent) 15%);
   --panel-border: color-mix(in oklab, var(--accent) 18%, var(--border-color));
+  --input-bg: var(--background-alt);
+  --input-border: var(--border-strong);
 }
 :root[data-theme="light"] {
   /* light theme: make it visible on white, lower saturation so it's soft */
-  --panel-bg: color-mix(in oklab, var(--background-alt) 94%, var(--accent) 6%);
-  --panel-border: color-mix(in oklab, var(--accent) 14%, var(--border-color));
+  --panel-bg: color-mix(in oklab, var(--background-alt) 85%, var(--accent) 15%);
+  --panel-border: color-mix(in oklab, var(--accent) 20%, var(--border-color));
+  --input-bg: var(--background-alt);
+  --input-border: var(--border-color);
 }
 
 .panel-tinted {
   background: var(--panel-bg);
-  border-color: var(--panel-border);
+  border: 1px solid var(--panel-border);
+}
+
+/* Job Finder button system */
+:root {
+  --jf-btn-bg: color-mix(in oklab, var(--background-alt) 84%, white 16%);
+  --jf-btn-bg-hover: color-mix(in oklab, var(--background-alt) 72%, white 28%);
+  --jf-btn-text: var(--foreground);
+  --jf-btn-border: color-mix(in oklab, var(--foreground) 14%, var(--border-color));
+  --jf-btn-primary-bg: color-mix(in oklab, var(--accent) 24%, var(--background-alt));
+  --jf-btn-primary-bg-hover: color-mix(in oklab, var(--accent) 34%, var(--background-alt));
+  --jf-btn-primary-border: color-mix(in oklab, var(--accent) 56%, var(--border-color));
+  --jf-btn-info-bg: color-mix(in oklab, #3b82f6 28%, var(--background-alt));
+  --jf-btn-info-bg-hover: color-mix(in oklab, #3b82f6 40%, var(--background-alt));
+  --jf-btn-info-border: color-mix(in oklab, #3b82f6 62%, var(--border-color));
+  --jf-btn-info-text: #d9ecff;
+  --jf-btn-accent-bg: color-mix(in oklab, #8b5cf6 26%, var(--background-alt));
+  --jf-btn-accent-bg-hover: color-mix(in oklab, #8b5cf6 38%, var(--background-alt));
+  --jf-btn-accent-border: color-mix(in oklab, #8b5cf6 60%, var(--border-color));
+  --jf-btn-accent-text: #efe5ff;
+  --jf-btn-success-bg: color-mix(in oklab, #16a34a 42%, var(--background-alt));
+  --jf-btn-success-bg-hover: color-mix(in oklab, #16a34a 52%, var(--background-alt));
+  --jf-btn-success-border: color-mix(in oklab, #16a34a 65%, var(--border-color));
+  --jf-btn-success-text: #ecfdf3;
+}
+
+:root[data-theme="light"] {
+  --jf-btn-bg: color-mix(in oklab, white 88%, #d8e4ef 12%);
+  --jf-btn-bg-hover: color-mix(in oklab, white 76%, #d8e4ef 24%);
+  --jf-btn-text: #0f172a;
+  --jf-btn-border: color-mix(in oklab, #334155 26%, var(--border-color));
+  --jf-btn-primary-bg: color-mix(in oklab, white 68%, #86d7b8 32%);
+  --jf-btn-primary-bg-hover: color-mix(in oklab, white 58%, #86d7b8 42%);
+  --jf-btn-primary-border: color-mix(in oklab, #2f7c66 50%, var(--border-color));
+  --jf-btn-info-bg: color-mix(in oklab, white 70%, #93c5fd 30%);
+  --jf-btn-info-bg-hover: color-mix(in oklab, white 56%, #93c5fd 44%);
+  --jf-btn-info-border: color-mix(in oklab, #2563eb 48%, var(--border-color));
+  --jf-btn-info-text: #0f3a75;
+  --jf-btn-accent-bg: color-mix(in oklab, white 72%, #c4b5fd 28%);
+  --jf-btn-accent-bg-hover: color-mix(in oklab, white 58%, #c4b5fd 42%);
+  --jf-btn-accent-border: color-mix(in oklab, #7c3aed 48%, var(--border-color));
+  --jf-btn-accent-text: #4c1d95;
+  --jf-btn-success-bg: color-mix(in oklab, white 64%, #38a169 36%);
+  --jf-btn-success-bg-hover: color-mix(in oklab, white 54%, #38a169 46%);
+  --jf-btn-success-border: color-mix(in oklab, #2f855a 54%, var(--border-color));
+  --jf-btn-success-text: #14532d;
+}
+
+.jf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 2.2rem;
+  border-radius: .7rem;
+  border: 1px solid var(--jf-btn-border);
+  background: var(--jf-btn-bg);
+  color: var(--jf-btn-text);
+  font-size: .78rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .02em;
+  box-shadow: var(--shadow-1);
+  transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.jf-btn:hover {
+  background: var(--jf-btn-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--foreground);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2);
+}
+
+.jf-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-1);
+}
+
+.jf-btn-primary {
+  background: var(--jf-btn-primary-bg);
+  border-color: var(--jf-btn-primary-border);
+}
+
+.jf-btn-primary:hover {
+  background: var(--jf-btn-primary-bg-hover);
+  border-color: var(--jf-btn-primary-border);
+}
+
+.jf-btn-success {
+  background: var(--jf-btn-success-bg);
+  border-color: var(--jf-btn-success-border);
+  color: var(--jf-btn-success-text);
+}
+
+.jf-btn-success:hover {
+  background: var(--jf-btn-success-bg-hover);
+  border-color: var(--jf-btn-success-border);
+  color: var(--jf-btn-success-text);
+}
+
+.jf-btn-info {
+  background: var(--jf-btn-info-bg);
+  border-color: var(--jf-btn-info-border);
+  color: var(--jf-btn-info-text);
+}
+
+.jf-btn-info:hover {
+  background: var(--jf-btn-info-bg-hover);
+  border-color: var(--jf-btn-info-border);
+  color: var(--jf-btn-info-text);
+}
+
+.jf-btn-accent {
+  background: var(--jf-btn-accent-bg);
+  border-color: var(--jf-btn-accent-border);
+  color: var(--jf-btn-accent-text);
+}
+
+.jf-btn-accent:hover {
+  background: var(--jf-btn-accent-bg-hover);
+  border-color: var(--jf-btn-accent-border);
+  color: var(--jf-btn-accent-text);
 }
 
 /* -------------------------------
@@ -321,6 +474,17 @@ select {
   -webkit-appearance: none;
   -moz-appearance: none;
   font-size: 0.9rem;
+  transition: background .25s, border-color .25s;
+}
+
+/* inputs and textareas should also adapt to theme */
+input, textarea {
+  background: var(--input-bg);
+  color: var(--foreground);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  outline: none;
   transition: background .25s, border-color .25s;
 }
 
@@ -351,4 +515,3 @@ select:focus {
 
 /* Light theme override not required —
    It auto-works because all colors come from variables */
-
