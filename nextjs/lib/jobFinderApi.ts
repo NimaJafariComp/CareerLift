@@ -148,3 +148,12 @@ export async function fetchResumeGraph(personName: unknown) {
   if (!res.ok) throw new Error(`Failed to refresh resume graph: ${res.status}`);
   return res.json();
 }
+
+export async function getSkillGapAnalysis(resumeId: string) {
+  const base = getApiBase();
+  const res = await fetch(`${base}/api/resume/skill-gap-analysis/${encodeURIComponent(resumeId)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Failed to fetch skill gap analysis: ${res.status}`);
+  return res.json();
+}

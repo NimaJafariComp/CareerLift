@@ -14,6 +14,7 @@ from app.schemas.resume import (
     SavedJobCreate,
     SavedJobInfo,
     SavedJobsList,
+    SkillGapAnalysis,
 )
 from typing import List, Optional
 import uuid
@@ -458,3 +459,204 @@ async def remove_saved_job(resume_id: str, job_apply_url: str, db=Depends(get_db
         raise HTTPException(status_code=404, detail="Saved job not found")
 
     return {"message": "Job removed from saved list"}
+
+
+@router.get("/skill-gap-analysis/{resume_id}", response_model=SkillGapAnalysis)
+async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
+    """
+    Perform comprehensive skill gap analysis for a resume based on saved jobs.
+
+    Compares resume skills against requirements across all saved jobs,
+    identifying missing critical skills and providing recommendations.
+    """
+    # Get resume info
+    resume_query = """
+    MATCH (r:Resume {id: $resume_id})
+    RETURN r.name AS resume_name, r.person_name AS person_name
+    """
+    resume_result = await db.run(resume_query, resume_id=resume_id)
+    resume_record = await resume_result.single()
+
+    if not resume_record:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    # Get person's skills for ATS scoring
+    person_query = """
+    MATCH (p:Person {name: $person_name})
+    OPTIONAL MATCH (p)-[:HAS_SKILL]->(s:Skill)
+    OPTIONAL MATCH (p)-[:HAS_EXPERIENCE]->(e:Experience)
+    OPTIONAL MATCH (p)-[:HAS_EDUCATION]->(ed:Education)
+    OPTIONAL MATCH (p)<-[:BELONGS_TO]-(r:Resume {id: $resume_id})
+    RETURN collect(DISTINCT s.name) AS skills,
+           collect(DISTINCT e.description) AS experiences,
+           collect(DISTINCT e.title) AS experience_titles,
+           collect(DISTINCT ed.degree) AS education,
+           collect(DISTINCT r.text) AS resume_texts
+    """
+    person_result = await db.run(
+        person_query,
+        person_name=resume_record["person_name"],
+        resume_id=resume_id,
+    )
+    person_data = await person_result.single()
+
+    resume_profile = ats_service.build_resume_profile(
+        skills=person_data["skills"] or [],
+        experiences=person_data["experiences"] or [],
+        experience_titles=person_data["experience_titles"] or [],
+        education=person_data["education"] or [],
+        resume_text=" ".join(person_data["resume_texts"] or []),
+    )
+
+    # Get saved jobs
+    jobs_query = """
+    MATCH (r:Resume {id: $resume_id})-[s:SAVED_JOB]->(j:JobPosting)
+    RETURN j.title AS title,
+           j.company AS company,
+           j.location AS location,
+           j.apply_url AS apply_url,
+           j.source AS source,
+           j.description AS description
+    ORDER BY s.saved_at DESC
+    """
+
+    result = await db.run(jobs_query, resume_id=resume_id)
+
+    jobs_data = []
+    async for record in result:
+        job_data = {
+            "description": record.get("description", ""),
+            "title": record.get("title", ""),
+            "company": record.get("company", ""),
+            "location": record.get("location", ""),
+        }
+        jobs_data.append(job_data)
+
+    if not jobs_data:
+        raise HTTPException(status_code=400, detail="No saved jobs found for analysis")
+
+    # Analyze skill gaps across all saved jobs
+    all_required_skills = {}  # skill -> count
+    all_preferred_skills = {}  # skill -> count
+    all_job_skills = set()
+    matched_skills = set()
+    total_ats_scores = 0
+
+    for job_data in jobs_data:
+        scoring = ats_service.score_resume_to_job(resume_profile, job_data)
+        total_ats_scores += scoring["ats_score"]
+
+        ats_details = scoring.get("ats_details", {})
+
+        # Track required skills
+        if "matched" in ats_details and "required_skills" in ats_details["matched"]:
+            matched_skills.update(ats_details["matched"]["required_skills"])
+
+        if "missing" in ats_details and "required_skills" in ats_details["missing"]:
+            for skill in ats_details["missing"]["required_skills"]:
+                all_required_skills[skill] = all_required_skills.get(skill, 0) + 1
+
+        if "missing" in ats_details and "preferred_skills" in ats_details["missing"]:
+            for skill in ats_details["missing"]["preferred_skills"]:
+                all_preferred_skills[skill] = all_preferred_skills.get(skill, 0) + 1
+
+        # Track all job skills
+        if "job_requirements" in ats_details and "all_skills" in ats_details["job_requirements"]:
+            all_job_skills.update(ats_details["job_requirements"]["all_skills"])
+
+    job_count = len(jobs_data)
+    avg_ats_score = total_ats_scores / job_count if job_count > 0 else 0
+
+    # Categorize skill gaps by importance
+    def get_importance(frequency: int) -> str:
+        ratio = frequency / job_count
+        if ratio >= 0.7:
+            return "critical"
+        elif ratio >= 0.4:
+            return "high"
+        elif ratio >= 0.2:
+            return "medium"
+        else:
+            return "low"
+
+    missing_required = [
+        {
+            "skill": skill,
+            "frequency": count,
+            "importance": get_importance(count)
+        }
+        for skill, count in sorted(
+            all_required_skills.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+    ]
+
+    missing_preferred = [
+        {
+            "skill": skill,
+            "frequency": count,
+            "importance": get_importance(count)
+        }
+        for skill, count in sorted(
+            all_preferred_skills.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+    ]
+
+    # Generate recommendations
+    recommendations = []
+    if missing_required:
+        critical_skills = [s["skill"] for s in missing_required if s["importance"] == "critical"]
+        if critical_skills:
+            recommendations.append(
+                f"Priority: Learn {', '.join(critical_skills[:3])} - these are required by most opportunities"
+            )
+
+    high_value_skills = [s["skill"] for s in missing_required[:5] if s["importance"] in ["high", "critical"]]
+    if high_value_skills:
+        recommendations.append(
+            f"Focus on building expertise in {', '.join(high_value_skills)} to improve competitiveness"
+        )
+
+    if missing_preferred:
+        top_preferred = [s["skill"] for s in missing_preferred[:3]]
+        recommendations.append(
+            f"Consider learning {', '.join(top_preferred)} as bonus skills to stand out"
+        )
+
+    matched_count = len(matched_skills)
+    total_unique_jobs_skills = len(all_job_skills)
+    if matched_count > 0 and total_unique_jobs_skills > 0:
+        coverage = (matched_count / total_unique_jobs_skills) * 100
+        recommendations.append(
+            f"You have {coverage:.0f}% coverage of skills across saved opportunities"
+        )
+
+    if avg_ats_score < 70:
+        recommendations.append(
+            "Consider tailoring your resume with more relevant keywords and achievements"
+        )
+
+    return SkillGapAnalysis(
+        resume_id=resume_id,
+        resume_name=resume_record["resume_name"],
+        skill_analysis={
+            "matched_skills": sorted(list(matched_skills)),
+            "missing_required_skills": missing_required,
+            "missing_preferred_skills": missing_preferred,
+            "all_job_skills": sorted(list(all_job_skills)),
+            "average_ats_score": round(avg_ats_score, 2),
+            "job_count": job_count,
+        },
+        recommendations=recommendations,
+        summary={
+            "total_saved_jobs": job_count,
+            "average_ats_score": round(avg_ats_score, 2),
+            "matched_skills_count": matched_count,
+            "missing_required_skills_count": len(all_required_skills),
+            "missing_preferred_skills_count": len(all_preferred_skills),
+            "critical_skills_to_learn": [s["skill"] for s in missing_required if s["importance"] == "critical"],
+        }
+    )
