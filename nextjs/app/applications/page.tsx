@@ -107,15 +107,13 @@ export default function ApplicationsPage() {
       : applications.filter((app) => app.status === tab).length;
  
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <header className="mb-8">
-        <h1 className="mb-2 text-[40px] font-semibold tracking-tight heading-gradient">
-          Applications
-        </h1>
-        <p className="text-sm text-muted">
-          Track every application milestone.
-        </p>
-      </header>
+    <main className="mx-auto max-w-400">
+      <h1 className="text-[40px] font-semibold tracking-tight heading-gradient mb-2">
+        Applications
+      </h1>
+      <p className="text-[15px] text-muted mb-6">
+        Track every application milestone.
+      </p>
  
       {/* Tabs */}
       <div className="flex gap-0 border-b border-(--border-color) mb-6 overflow-x-auto">
