@@ -77,13 +77,13 @@ export default function CoachCenterPage() {
               <div className="card hover-ring mb-6 card-hue">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-[20px] font-medium">Skill Gap Analysis</h2>
-                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Comnig soon ...</h3>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Coming soon ...</h3>
                 </div>
             </div>
             <div className="card hover-ring mb-6 card-hue">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-[20px] font-medium">Growth Plans</h2>
-                <h3 className="text-lg font-semibold text-slate-700 mb-2">Comnig soon ...</h3>
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">Coming soon ...</h3>
               </div>
             </div>
           </div>
