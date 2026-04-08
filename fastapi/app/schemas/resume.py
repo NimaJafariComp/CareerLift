@@ -51,3 +51,29 @@ class SavedJobsList(BaseModel):
     resume_id: str
     resume_name: str
     jobs: List[SavedJobInfo]
+
+
+class SkillGapItem(BaseModel):
+    """Information about a specific skill gap."""
+    skill: str
+    frequency: int  # How many jobs require this skill
+    importance: str  # "critical" (in most jobs), "high", "medium", "low"
+
+
+class SkillAnalysis(BaseModel):
+    """Skill analysis for gap analysis."""
+    matched_skills: List[str]
+    missing_required_skills: List[SkillGapItem]
+    missing_preferred_skills: List[SkillGapItem]
+    all_job_skills: List[str]
+    average_ats_score: float
+    job_count: int
+
+
+class SkillGapAnalysis(BaseModel):
+    """Comprehensive skill gap analysis based on saved jobs."""
+    resume_id: str
+    resume_name: str
+    skill_analysis: SkillAnalysis
+    recommendations: List[str]
+    summary: dict[str, Any]
