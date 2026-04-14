@@ -1,5 +1,7 @@
 import RecentResumeCard from "@/components/RecentResumeCard";
 import SavedJobsCard from "@/components/SavedJobsCard";
+import ApplicationsCard from "@/components/ApplicationsCard";
+import CoachCenterCard from "@/components/CoachCenterCard";
 
 export default function Home() {
   return (
@@ -11,6 +13,8 @@ export default function Home() {
       <section className="grid gap-9 lg:grid-cols-2">
         <RecentResumeCard />
         <SavedJobsCard />
+        <ApplicationsCard />
+        <CoachCenterCard />
       </section>
     </div>
   );
