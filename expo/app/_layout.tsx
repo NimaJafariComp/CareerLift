@@ -47,6 +47,7 @@ function DrawerLayout() {
         <Drawer.Screen name="applications" options={{ drawerLabel: "Applications", title: "Applications" }} />
         <Drawer.Screen name="coach-center" options={{ drawerLabel: "Coach Center", title: "Coach Center" }} />
         <Drawer.Screen name="settings" options={{ drawerLabel: "Settings", title: "Settings" }} />
+        <Drawer.Screen name="resume-preview" options={{ drawerItemStyle: { display: "none" }, title: "Resume Preview" }} />
       </Drawer>
     </GestureHandlerRootView>
   );
