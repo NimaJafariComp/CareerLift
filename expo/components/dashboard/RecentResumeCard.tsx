@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -90,9 +91,11 @@ export function RecentResumeCard() {
     }
   }, []);
 
-  React.useEffect(() => {
-    void loadResume();
-  }, [loadResume]);
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadResume();
+    }, [loadResume])
+  );
 
   return (
     <Card delay={30}>
@@ -111,7 +114,7 @@ export function RecentResumeCard() {
       {resume === null && !error ? (
         <EmptyState
           title="No resume selected yet"
-          message="Resume Lab is framed and ready for the mobile implementation pass. We’ll surface your latest uploaded resume here."
+          message="Upload or reopen a resume in Resume Lab and we’ll pin its latest details, stats, and graph-backed context here."
           actionLabel="Go to Resume Lab"
           onAction={() => router.push("/resume-lab")}
         />
@@ -143,7 +146,7 @@ export function RecentResumeCard() {
               style={{ backgroundColor: theme.palette.surfaceMuted, borderWidth: 1, borderColor: theme.palette.divider }}
             >
               <Text style={{ color: theme.palette.muted, lineHeight: theme.text.size(19), fontSize: theme.text.size(13) }}>
-                Detailed parsing stats will appear here once Resume Lab is implemented on mobile. Your current resume context is already pinned.
+                Detailed parsing stats are not available for this resume snapshot yet, but your current resume context is already pinned.
               </Text>
             </View>
           )}

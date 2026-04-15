@@ -21,9 +21,12 @@ type GraphNode = {
   type: "person" | "skill" | "experience" | "education" | "job" | "resume";
   x: number;
   y: number;
+  targetX: number;
+  targetY: number;
   detail: string;
   properties?: Record<string, unknown>;
   size: number;
+  fixed?: boolean;
 };
 
 type GraphEdge = {
@@ -288,9 +291,12 @@ function buildGraph(graphData: UploadGraphData) {
       type: "person",
       x: centerX,
       y: centerY,
+      targetX: centerX,
+      targetY: centerY,
       detail: graphData.person.summary || graphData.person.email || graphData.person.location || "Primary resume profile node.",
       properties: graphData.person as Record<string, unknown>,
       size: 68,
+      fixed: true,
     },
   ];
   const edges: GraphEdge[] = [];
@@ -323,6 +329,8 @@ function buildGraph(graphData: UploadGraphData) {
         type: item.type,
         x: centerX + Math.cos(angle) * layerRadius,
         y: centerY + Math.sin(angle) * layerRadius,
+        targetX: centerX + Math.cos(angle) * layerRadius,
+        targetY: centerY + Math.sin(angle) * layerRadius,
         detail: item.detail,
         properties: item.properties,
         size: item.size ?? smallNodeSize,
@@ -409,7 +417,68 @@ function buildGraph(graphData: UploadGraphData) {
     Math.PI / 2
   );
 
-  return { nodes, edges, canvasSize };
+  const laidOutNodes = resolveNodeCollisions(nodes, canvasSize, centerX, centerY);
+
+  return { nodes: laidOutNodes, edges, canvasSize };
+}
+
+function resolveNodeCollisions(nodes: GraphNode[], canvasSize: number, centerX: number, centerY: number) {
+  const padding = 34;
+  const next = nodes.map((node) => ({ ...node }));
+  const maxRadius = canvasSize / 2 - padding;
+
+  for (let iteration = 0; iteration < 240; iteration += 1) {
+    for (let i = 0; i < next.length; i += 1) {
+      const a = next[i];
+      if (!a.fixed) {
+        a.x += (a.targetX - a.x) * 0.08;
+        a.y += (a.targetY - a.y) * 0.08;
+      }
+
+      for (let j = i + 1; j < next.length; j += 1) {
+        const b = next[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 0.001;
+        const minDistance = a.size / 2 + b.size / 2 + 18;
+
+        if (distance < minDistance) {
+          const overlap = (minDistance - distance) / 2;
+          const pushX = (dx / distance) * overlap;
+          const pushY = (dy / distance) * overlap;
+
+          if (!a.fixed) {
+            a.x -= pushX;
+            a.y -= pushY;
+          }
+          if (!b.fixed) {
+            b.x += pushX;
+            b.y += pushY;
+          }
+        }
+      }
+    }
+
+    for (const node of next) {
+      if (node.fixed) continue;
+
+      const dx = node.x - centerX;
+      const dy = node.y - centerY;
+      const distance = Math.sqrt(dx * dx + dy * dy) || 0.001;
+      const allowedRadius = Math.max(node.size / 2 + padding, maxRadius - node.size / 2);
+
+      if (distance > allowedRadius) {
+        const scaleDown = allowedRadius / distance;
+        node.x = centerX + dx * scaleDown;
+        node.y = centerY + dy * scaleDown;
+      }
+
+      node.x = Math.max(padding + node.size / 2, Math.min(canvasSize - padding - node.size / 2, node.x));
+      node.y = Math.max(padding + node.size / 2, Math.min(canvasSize - padding - node.size / 2, node.y));
+    }
+  }
+
+  return next;
 }
 
 function getNodeColor(type: GraphNode["type"], palette: { accentStrong: string; accent: string; success: string; warning: string; surfaceStrong: string; danger: string }) {

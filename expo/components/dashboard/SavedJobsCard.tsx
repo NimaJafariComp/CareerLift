@@ -1,6 +1,7 @@
 import React from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -38,8 +39,7 @@ export function SavedJobsCard() {
   const [loadingJobs, setLoadingJobs] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    async function hydrate() {
+  const loadResumesState = React.useCallback(async () => {
       setLoadingResumes(true);
       setError(null);
 
@@ -54,29 +54,32 @@ export function SavedJobsCard() {
       } finally {
         setLoadingResumes(false);
       }
-    }
+    }, []);
 
-    void hydrate();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadResumesState();
+    }, [loadResumesState])
+  );
 
-  React.useEffect(() => {
-    if (!selectedId) {
-      setJobs(null);
-      return;
-    }
+  const loadJobsState = React.useCallback(
+    async (resumeId: string) => {
+      if (!resumeId) {
+        setJobs(null);
+        return;
+      }
 
-    async function hydrateJobs() {
       setLoadingJobs(true);
       setError(null);
 
       try {
-        await setStoredValue(SELECTED_KEY, selectedId);
-        const selectedResume = resumes.find((item) => item.resume_id === selectedId);
+        await setStoredValue(SELECTED_KEY, resumeId);
+        const selectedResume = resumes.find((item) => item.resume_id === resumeId);
         if (selectedResume) {
           await setRecentResume(makeRecentResumeFallback(selectedResume));
         }
 
-        const response = await getSavedJobs(selectedId);
+        const response = await getSavedJobs(resumeId);
         const sorted = [...response.jobs].sort((a, b) => (b.ats_score ?? -1) - (a.ats_score ?? -1));
         setJobs(sorted);
       } catch (nextError) {
@@ -84,10 +87,17 @@ export function SavedJobsCard() {
       } finally {
         setLoadingJobs(false);
       }
-    }
+    },
+    [resumes]
+  );
 
-    void hydrateJobs();
-  }, [selectedId, resumes]);
+  React.useEffect(() => {
+    if (!selectedId) {
+      setJobs(null);
+      return;
+    }
+    void loadJobsState(selectedId);
+  }, [loadJobsState, selectedId, resumes]);
 
   return (
     <Card delay={90}>
@@ -102,7 +112,7 @@ export function SavedJobsCard() {
       </View>
 
       {loadingResumes ? <LoadingState label="Loading resumes…" /> : null}
-      {error ? <ErrorState title="Saved jobs unavailable" message={error} onRetry={() => setSelectedId((current) => current)} /> : null}
+      {error ? <ErrorState title="Saved jobs unavailable" message={error} onRetry={() => void (selectedId ? loadJobsState(selectedId) : loadResumesState())} /> : null}
 
       {!loadingResumes && resumes.length === 0 && !error ? (
         <EmptyState

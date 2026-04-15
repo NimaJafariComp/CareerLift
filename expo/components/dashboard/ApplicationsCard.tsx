@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -17,9 +18,20 @@ export function ApplicationsCard() {
   const { theme } = useAppTheme();
   const [applications, setApplications] = React.useState<SavedApplication[] | null>(null);
 
-  React.useEffect(() => {
-    loadApplications().then(setApplications).catch(() => setApplications([]));
+  const refreshApplications = React.useCallback(async () => {
+    try {
+      const next = await loadApplications();
+      setApplications(next);
+    } catch {
+      setApplications([]);
+    }
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      void refreshApplications();
+    }, [refreshApplications])
+  );
 
   const counts: Record<ApplicationStatus, number> = {
     Applied: 0,

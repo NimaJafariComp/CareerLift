@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -28,8 +29,7 @@ export function CoachCenterCard() {
 
   const selectedResume = resumes.find((item) => item.resume_id === selectedId) ?? null;
 
-  React.useEffect(() => {
-    async function hydrate() {
+  const loadResumesState = React.useCallback(async () => {
       setLoading(true);
       setError(null);
 
@@ -42,28 +42,31 @@ export function CoachCenterCard() {
       } finally {
         setLoading(false);
       }
-    }
+    }, []);
 
-    void hydrate();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      void loadResumesState();
+    }, [loadResumesState])
+  );
 
-  React.useEffect(() => {
-    if (!selectedId) {
-      setAnalysis(null);
-      return;
-    }
+  const loadAnalysisState = React.useCallback(
+    async (resumeId: string) => {
+      if (!resumeId) {
+        setAnalysis(null);
+        return;
+      }
 
-    async function hydrateAnalysis() {
       setLoading(true);
       setError(null);
 
       try {
-        await setStoredValue(KEY, selectedId);
-        const selectedResume = resumes.find((item) => item.resume_id === selectedId);
+        await setStoredValue(KEY, resumeId);
+        const selectedResume = resumes.find((item) => item.resume_id === resumeId);
         if (selectedResume) {
           await setRecentResume(makeRecentResumeFallback(selectedResume));
         }
-        const response = await getSkillGapAnalysis(selectedId);
+        const response = await getSkillGapAnalysis(resumeId);
         setAnalysis(response);
       } catch (nextError) {
         const message = nextError instanceof Error ? nextError.message : "Unable to load skill gap analysis.";
@@ -72,10 +75,17 @@ export function CoachCenterCard() {
       } finally {
         setLoading(false);
       }
-    }
+    },
+    [resumes]
+  );
 
-    void hydrateAnalysis();
-  }, [selectedId, resumes]);
+  React.useEffect(() => {
+    if (!selectedId) {
+      setAnalysis(null);
+      return;
+    }
+    void loadAnalysisState(selectedId);
+  }, [loadAnalysisState, selectedId, resumes]);
 
   return (
     <Card delay={210}>
@@ -91,7 +101,7 @@ export function CoachCenterCard() {
 
       {loading && resumes.length === 0 ? <LoadingState label="Loading coaching context…" /> : null}
       {error && !error.toLowerCase().includes("no saved jobs") ? (
-        <ErrorState title="Coach Center unavailable" message={error} onRetry={() => setSelectedId((current) => current)} />
+        <ErrorState title="Coach Center unavailable" message={error} onRetry={() => void (selectedId ? loadAnalysisState(selectedId) : loadResumesState())} />
       ) : null}
 
       {!loading && resumes.length === 0 && !error ? (
