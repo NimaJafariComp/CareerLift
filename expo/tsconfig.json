@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "jsxImportSource": "nativewind",
+    "ignoreDeprecations": "5.0",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  }
+}
