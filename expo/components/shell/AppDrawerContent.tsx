@@ -1,0 +1,170 @@
+import React from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { DrawerContentComponentProps } from "@react-navigation/drawer";
+import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useAppTheme } from "@/lib/theme";
+
+const iconMap: Record<string, keyof typeof Feather.glyphMap> = {
+  index: "home",
+  "resume-lab": "file-text",
+  "job-finder": "briefcase",
+  applications: "folder",
+  "coach-center": "target",
+  settings: "settings",
+};
+
+const labelMap: Record<string, string> = {
+  index: "Dashboard",
+  "resume-lab": "Resume Lab",
+  "job-finder": "Job Finder",
+  applications: "Applications",
+  "coach-center": "Coach Center",
+  settings: "Settings",
+};
+
+export function AppDrawerContent({ state, navigation }: DrawerContentComponentProps) {
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <LinearGradient
+      colors={[theme.palette.drawerStart, theme.palette.drawerEnd]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView
+        style={{
+          ...styles.safeArea,
+          paddingHorizontal: 20,
+          paddingTop: Math.max(18, insets.top + 8),
+          paddingBottom: Math.max(18, insets.bottom + 12),
+        }}
+        edges={["top", "bottom", "left"]}
+      >
+        <View style={styles.brandBlock}>
+          <View
+            style={[
+              styles.brandChip,
+              {
+                backgroundColor: theme.palette.accentSoft,
+                borderColor: theme.palette.divider,
+              },
+            ]}
+          >
+            <Text style={{ color: theme.palette.accent, fontSize: 11, fontWeight: "700", letterSpacing: 0.9 }}>CAREERLIFT</Text>
+          </View>
+          <Text style={{ color: theme.palette.foreground, fontSize: 26, fontWeight: "700" }}>CareerLift</Text>
+          <Text style={{ color: theme.palette.muted, fontSize: 13 }}>Mobile command center</Text>
+        </View>
+
+        <View style={styles.menuList}>
+          {state.routes.map((route, index) => {
+            const focused = state.index === index;
+            const icon = iconMap[route.name] ?? "circle";
+
+            return (
+              <Pressable
+                key={route.key}
+                onPress={() => navigation.navigate(route.name)}
+                style={[
+                  styles.menuItem,
+                  {
+                    backgroundColor: focused ? theme.palette.surfaceStrong : "rgba(255,255,255,0.015)",
+                    borderColor: focused ? theme.palette.divider : "transparent",
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.iconWrap,
+                    {
+                      backgroundColor: focused ? theme.palette.accentSoft : "rgba(255,255,255,0.035)",
+                    },
+                  ]}
+                >
+                  <Feather name={icon} size={17} color={focused ? theme.palette.accent : theme.palette.muted} />
+                </View>
+                <View style={styles.menuTextWrap}>
+                  <Text style={{ color: focused ? theme.palette.foreground : theme.palette.muted, fontSize: 15, fontWeight: focused ? "700" : "500" }}>
+                    {labelMap[route.name] ?? route.name}
+                  </Text>
+                </View>
+                {focused ? <View style={[styles.activeDot, { backgroundColor: theme.palette.accent }]} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View
+          style={[
+            styles.footerCard,
+            {
+              borderColor: theme.palette.divider,
+              backgroundColor: theme.palette.surfaceMuted,
+            },
+          ]}
+        >
+          <Text style={{ color: theme.palette.foreground, fontWeight: "700" }}>Phase 1 mobile build</Text>
+          <Text style={{ color: theme.palette.muted, lineHeight: 20 }}>
+            Dashboard parity is live. Feature pages are framed and ready for their next implementation passes.
+          </Text>
+        </View>
+      </SafeAreaView>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
+  brandBlock: {
+    gap: 6,
+    paddingBottom: 26,
+  },
+  brandChip: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  menuList: {
+    gap: 8,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuTextWrap: {
+    flex: 1,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  footerCard: {
+    marginTop: "auto",
+    gap: 8,
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+  },
+});
