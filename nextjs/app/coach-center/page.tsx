@@ -46,7 +46,7 @@ export default function CoachCenterPage() {
         Coach Center
       </h1>
       <p className="text-[15px] text-muted mb-6">
-        Interactive AI career coach: interview prep, skill gap analysis, and tailored growth plans.
+        Interactive AI career coach: interview prep and skill gap analysis.
       </p>
        
 
@@ -100,15 +100,6 @@ export default function CoachCenterPage() {
               )}
             </div>
 
-            {/* Placeholder for Future Features */}
-            <div className="space-y-4">
-              <div className="card hover-ring mb-6 card-hue">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[20px] font-medium">Growth Plans</h2>
-                  <h3 className="mb-2 text-lg font-semibold text-muted">Coming soon ...</h3>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

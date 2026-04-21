@@ -116,7 +116,7 @@ export default function CoachCenterScreen() {
   return (
     <AppShell
       title="Coach Center"
-      subtitle="Interactive AI coaching for mock interviews, skill-gap analysis, and future growth plans."
+      subtitle="Interactive AI coaching for mock interviews and skill-gap analysis."
     >
       <Card delay={40}>
         <Text style={{ color: theme.palette.foreground, fontWeight: "700", fontSize: theme.text.size(18) }}>Mock Interview</Text>
@@ -171,14 +171,6 @@ export default function CoachCenterScreen() {
         )}
       </Card>
 
-      <Card delay={120}>
-        <View style={styles.gap}>
-          <Text style={{ color: theme.palette.foreground, fontWeight: "700", fontSize: theme.text.size(18) }}>Growth Plans</Text>
-          <Text style={{ color: theme.palette.muted, lineHeight: theme.text.size(20) }}>
-            Coming soon. This section is reserved for personalized development roadmaps, pacing guidance, and longer-term coaching surfaces.
-          </Text>
-        </View>
-      </Card>
     </AppShell>
   );
 }
