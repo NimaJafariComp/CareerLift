@@ -10,7 +10,7 @@ export default function AppLayout({
     <>
       <div className="min-h-screen lg:flex">
         <Sidebar />
-        <div className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12 fade-in">
+        <div className="min-w-0 flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 fade-in">
           {children}
         </div>
       </div>
