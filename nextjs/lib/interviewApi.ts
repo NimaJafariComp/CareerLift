@@ -55,6 +55,7 @@ export type SessionSummary = {
 };
 
 import { getApiBase } from "./jobFinderApi";
+import { apiFetch } from "@/lib/apiClient";
 
 export async function startInterview(
   resumeId: string,
@@ -62,7 +63,7 @@ export async function startInterview(
   roleLevel: string
 ): Promise<InterviewResponse> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/interview/start`, {
+  const res = await apiFetch(`${base}/api/interview/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -84,14 +85,14 @@ export async function submitInterviewAnswer(
   url.searchParams.set("session_id", sessionId);
   url.searchParams.set("answer", answer);
 
-  const res = await fetch(url.toString(), { method: "POST" });
+  const res = await apiFetch(url.toString(), { method: "POST" });
   if (!res.ok) throw new Error(`Failed to submit answer: ${res.status}`);
   return res.json();
 }
 
 export async function getInterviewSession(sessionId: string): Promise<InterviewSession> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/interview/session/${encodeURIComponent(sessionId)}`);
+  const res = await apiFetch(`${base}/api/interview/session/${encodeURIComponent(sessionId)}`);
   if (!res.ok) throw new Error(`Failed to fetch session: ${res.status}`);
   return res.json();
 }

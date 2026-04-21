@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import type { ResumeData } from "../types/resume";
+import { apiAxios } from "@/lib/apiClient";
 
 interface UseAutoCompileOptions {
   resumeData: ResumeData | null;
@@ -68,7 +69,7 @@ export function useAutoCompile({
     setCompileError(null);
 
     try {
-      const response = await axios.post(
+      const response = await apiAxios.post(
         `${apiUrl}/api/latex/compile/preview?page=${targetPage}`,
         {
           template_id: template,

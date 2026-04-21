@@ -186,12 +186,17 @@ export default function UploadStep({
                 htmlFor="resume-lab-resume-name"
                 className="form-label mt-3 text-left"
               >
-                Resume name
+                Resume name <span className="text-red-400">*</span>
               </label>
               <input
                 id="resume-lab-resume-name"
                 type="text"
-                className="form-control w-full rounded-lg p-2"
+                required
+                className={`form-control w-full rounded-lg p-2 ${
+                  file && !resumeNameInput.trim()
+                    ? "border border-red-500/40"
+                    : ""
+                }`}
                 placeholder="Spring 2026 software engineering resume"
                 aria-describedby="resume-lab-resume-name-help"
                 value={resumeNameInput}
@@ -199,9 +204,13 @@ export default function UploadStep({
               />
               <p
                 id="resume-lab-resume-name-help"
-                className="form-helper text-left"
+                className={`form-helper text-left ${
+                  file && !resumeNameInput.trim() ? "text-red-400" : ""
+                }`}
               >
-                Give this version a clear label so it is easier to find later.
+                {file && !resumeNameInput.trim()
+                  ? "A resume name is required before processing."
+                  : "Give this version a clear label so it is easier to find later."}
               </p>
             </div>
 
@@ -227,9 +236,10 @@ export default function UploadStep({
           <button
             type="button"
             onClick={onUpload}
-            className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
+            disabled={!resumeNameInput.trim()}
+            className="mt-4 w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Process Resume
+            {resumeNameInput.trim() ? "Process Resume" : "Add a resume name to continue"}
           </button>
         )}
 

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 
 import type { TemplateInfo, ResumeData } from "../../types/resume";
+import { apiAxios } from "@/lib/apiClient";
 
 interface Props {
   templates: TemplateInfo[];
@@ -78,7 +79,7 @@ export default function TemplateSelector({
 
       setLoading((prev) => ({ ...prev, [t.id]: true }));
 
-      axios
+      apiAxios
         .post(
           `${API_URL}/api/latex/compile/preview?dpi=72`,
           { template_id: t.id, resume_data: data },
@@ -116,7 +117,7 @@ export default function TemplateSelector({
       fetchedRef.current.add(t.id);
       setLoading((prev) => ({ ...prev, [t.id]: true }));
 
-      axios
+      apiAxios
         .post(
           `${API_URL}/api/latex/compile/preview?dpi=72`,
           { template_id: t.id, resume_data: resumeData },

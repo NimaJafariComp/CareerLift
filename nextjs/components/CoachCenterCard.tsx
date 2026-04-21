@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import SkillGapAnalysisComponent from "@/components/SkillGapAnalysis";
 import { useActiveResume } from "@/hooks/useActiveResume";
+import { formatResumeLabel } from "@/lib/resumeLoader";
 
 export default function CoachCenterCard() {
   const activeResume = useActiveResume();
@@ -27,10 +28,13 @@ export default function CoachCenterCard() {
         </p>
       ) : (
         <>
-          <p className="text-xs text-muted mb-3 truncate" title={activeResume.resume_name}>
+          <p
+            className="text-xs text-muted mb-3 truncate"
+            title={formatResumeLabel(activeResume)}
+          >
             Analyzing{" "}
             <span className="text-foreground font-medium">
-              {activeResume.resume_name || activeResume.filename}
+              {formatResumeLabel(activeResume)}
             </span>
           </p>
           <div className="flex-1 overflow-y-auto">

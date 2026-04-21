@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useApplications, ApplicationStatus } from "@/hooks/useApplications";
 import { useActiveResume } from "@/hooks/useActiveResume";
 import { getSavedJobs } from "@/lib/jobFinderApi";
+import { formatResumeLabel } from "@/lib/resumeLoader";
 
 const STATUS_COLORS: Record<ApplicationStatus, string> = {
+  Pending: "bg-slate-500/20 text-slate-300 border-slate-500/30",
   Applied: "bg-blue-500/20 text-blue-300 border-blue-500/30",
   Interview: "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
   Offer: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
@@ -51,6 +53,7 @@ export default function ApplicationsCard() {
   }, [applications, allowedUrls, activeResumeId]);
 
   const counts: Record<ApplicationStatus, number> = {
+    Pending: 0,
     Applied: 0,
     Interview: 0,
     Offer: 0,
@@ -81,15 +84,18 @@ export default function ApplicationsCard() {
         </p>
       ) : (
         <>
-          <p className="text-xs text-muted mb-3 truncate" title={activeResume?.resume_name}>
+          <p
+            className="text-xs text-muted mb-3 truncate"
+            title={activeResume ? formatResumeLabel(activeResume) : ""}
+          >
             For{" "}
             <span className="text-foreground font-medium">
-              {activeResume?.resume_name || activeResume?.filename}
+              {activeResume ? formatResumeLabel(activeResume) : ""}
             </span>
           </p>
 
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {(["Applied", "Interview", "Offer", "Rejected"] as ApplicationStatus[]).map((status) => (
+          <div className="grid grid-cols-5 gap-2 mb-4">
+            {(["Pending", "Applied", "Interview", "Offer", "Rejected"] as ApplicationStatus[]).map((status) => (
               <div
                 key={status}
                 className={`rounded-lg border px-2 py-2 text-center ${STATUS_COLORS[status]}`}

@@ -1,4 +1,5 @@
 import type { Job, Resume } from "@/components/job-finder/types";
+import { apiFetch } from "@/lib/apiClient";
 
 export function asString(value: unknown): string {
   if (value == null) return "";
@@ -40,7 +41,7 @@ export async function loadJobsBySource(
   const base = getApiBase();
   if (!base) return [];
 
-  const res = await fetch(`${base}/jobs/fetch-live/${source}?${qs.toString()}`);
+  const res = await apiFetch(`${base}/jobs/fetch-live/${source}?${qs.toString()}`);
   if (!res.ok) throw new Error(`Backend returned ${res.status}`);
 
   const data = await res.json();
@@ -52,7 +53,7 @@ export async function calculateAtsScores(
   resumeId: string
 ): Promise<Job[]> {
   const base = getApiBase();
-  const res = await fetch(`${base}/jobs/calculate-ats`, {
+  const res = await apiFetch(`${base}/jobs/calculate-ats`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ jobs, resume_id: resumeId }),
@@ -63,7 +64,7 @@ export async function calculateAtsScores(
 
 export async function addJobToGraph(job: Job) {
   const base = getApiBase();
-  const res = await fetch(`${base}/jobs/add-to-graph`, {
+  const res = await apiFetch(`${base}/jobs/add-to-graph`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(job),
@@ -74,7 +75,7 @@ export async function addJobToGraph(job: Job) {
 
 export async function listResumes(): Promise<Resume[]> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/resume/list`, { cache: "no-store" });
+  const res = await apiFetch(`${base}/api/resume/list`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load resumes: ${res.status}`);
   const data = await res.json();
   return data.resumes || [];
@@ -82,25 +83,50 @@ export async function listResumes(): Promise<Resume[]> {
 
 export async function deleteResume(resumeId: string): Promise<void> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/resume/${resumeId}`, {
+  const res = await apiFetch(`${base}/api/resume/${resumeId}`, {
     method: "DELETE",
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Failed to delete resume: ${res.status}`);
 }
 
-export async function saveJobToResume(resumeId: string, jobUrl: string) {
+/** Snapshot of a job posting; sent to the backend so /api/resume/save-job
+ *  can MERGE the JobPosting and link it in a single atomic request. */
+export type JobSnapshot = {
+  apply_url: string;
+  title?: string | null;
+  company?: string | null;
+  location?: string | null;
+  source?: string | null;
+  description?: string | null;
+  salary_text?: string | null;
+  employment_type?: string | null;
+  remote?: boolean | null;
+  posted_at?: string | null;
+  source_url?: string | null;
+};
+
+export async function saveJobToResume(
+  resumeId: string,
+  jobOrUrl: JobSnapshot | string,
+  notes: string = "",
+) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/resume/save-job`, {
+  const job: JobSnapshot =
+    typeof jobOrUrl === "string" ? { apply_url: jobOrUrl } : jobOrUrl;
+  const res = await apiFetch(`${base}/api/resume/save-job`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       resume_id: resumeId,
-      job_apply_url: jobUrl,
-      notes: "",
+      job,
+      notes,
     }),
   });
-  if (!res.ok) throw new Error(`Failed to save job to resume: ${res.status}`);
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Failed to save job: ${res.status} ${detail.slice(0, 200)}`);
+  }
   return res.json();
 }
 
@@ -123,7 +149,7 @@ export type SavedJobsList = {
 
 export async function getSavedJobs(resumeId: string): Promise<SavedJobsList> {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/resume/saved-jobs/${encodeURIComponent(resumeId)}`, {
+  const res = await apiFetch(`${base}/api/resume/saved-jobs/${encodeURIComponent(resumeId)}`, {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Failed to fetch saved jobs: ${res.status}`);
@@ -132,7 +158,7 @@ export async function getSavedJobs(resumeId: string): Promise<SavedJobsList> {
 
 export async function removeJobFromResume(resumeId: string, jobUrl: string) {
   const base = getApiBase();
-  const res = await fetch(
+  const res = await apiFetch(
     `${base}/api/resume/saved-job/${encodeURIComponent(resumeId)}/${encodeURIComponent(jobUrl)}`,
     { method: "DELETE", cache: "no-store" }
   );
@@ -142,7 +168,7 @@ export async function removeJobFromResume(resumeId: string, jobUrl: string) {
 
 export async function fetchResumeGraph(personName: unknown) {
   const base = getApiBase();
-  const res = await fetch(
+  const res = await apiFetch(
     `${base}/api/resume/graph/${encodeURIComponent(asString(personName))}`
   );
   if (!res.ok) throw new Error(`Failed to refresh resume graph: ${res.status}`);
@@ -151,7 +177,7 @@ export async function fetchResumeGraph(personName: unknown) {
 
 export async function getSkillGapAnalysis(resumeId: string) {
   const base = getApiBase();
-  const res = await fetch(`${base}/api/resume/skill-gap-analysis/${encodeURIComponent(resumeId)}`, {
+  const res = await apiFetch(`${base}/api/resume/skill-gap-analysis/${encodeURIComponent(resumeId)}`, {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Failed to fetch skill gap analysis: ${res.status}`);

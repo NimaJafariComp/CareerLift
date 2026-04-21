@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { listResumes, getSavedJobs, SavedJobInfo, asString } from "@/lib/jobFinderApi";
+import { formatResumeLabel } from "@/lib/resumeLoader";
 import type { Resume } from "@/components/job-finder/types";
 
 const ROLE_LEVELS = ["entry", "mid", "senior"];
@@ -114,7 +115,7 @@ export default function MockInterviewSetup({ onStartInterview }: MockInterviewSe
             <option value="">-- Select a resume --</option>
             {resumes.map((resume) => (
               <option key={resume.resume_id} value={resume.resume_id}>
-                {resume.resume_name} ({asString(resume.person_name)})
+                {formatResumeLabel(resume)} ({asString(resume.person_name)})
               </option>
             ))}
           </select>

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import axios from "axios";
 import EditStep from "@/components/resume-lab/EditStep";
 import GraphStep from "@/components/resume-lab/GraphStep";
 import PreviewStep from "@/components/resume-lab/PreviewStep";
@@ -16,6 +15,7 @@ import type {
   UploadResult,
 } from "@/components/resume-lab/types";
 import { useAutoCompile } from "@/hooks/useAutoCompile";
+import { apiAxios } from "@/lib/apiClient";
 import { deleteResume, listResumes } from "@/lib/jobFinderApi";
 import {
   asString,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/resumeDataMapper";
 import {
   loadResumeById,
+  persistEditedAt,
   persistStoredResume,
   toUploadResult,
 } from "@/lib/resumeLoader";
@@ -49,7 +50,7 @@ export default function ResumeLabPage() {
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [personNameInput, setPersonNameInput] = useState("");
-  const [resumeNameInput, setResumeNameInput] = useState("Default Resume");
+  const [resumeNameInput, setResumeNameInput] = useState("");
   const [activeStep, setActiveStep] = useState<ResumeLabStepId>(
     initialStepParam ?? "upload"
   );
@@ -92,7 +93,7 @@ export default function ResumeLabPage() {
   });
 
   useEffect(() => {
-    axios
+    apiAxios
       .get<TemplateInfo[]>(`${API_URL}/api/latex/templates`)
       .then((res) => setTemplates(res.data))
       .catch(() => {});
@@ -173,7 +174,7 @@ export default function ResumeLabPage() {
             setResult(null);
             setResumeData(null);
             setPersonNameInput("");
-            setResumeNameInput("Default Resume");
+            setResumeNameInput("");
             seededInitialStepRef.current = false;
           }
         })
@@ -327,7 +328,7 @@ export default function ResumeLabPage() {
     }
 
     try {
-      const response = await axios.post<UploadResult>(
+      const response = await apiAxios.post<UploadResult>(
         `${API_URL}/api/resume/upload`,
         formData,
         {
@@ -424,7 +425,7 @@ export default function ResumeLabPage() {
 
     setDownloadingPdf(true);
     try {
-      const response = await axios.post<Blob>(
+      const response = await apiAxios.post<Blob>(
         `${API_URL}/api/latex/compile`,
         { template_id: selectedTemplate, resume_data: resumeData },
         { responseType: "blob" }
@@ -484,7 +485,7 @@ export default function ResumeLabPage() {
     setSelectedTemplate(null);
     setUploadedFileUrl(null);
     setPersonNameInput("");
-    setResumeNameInput("Default Resume");
+    setResumeNameInput("");
     setActiveStep("upload");
     seededInitialStepRef.current = false;
   };
@@ -591,7 +592,14 @@ export default function ResumeLabPage() {
           lastCompileTime={lastCompileTime}
           downloadingPdf={downloadingPdf}
           onTemplateSelect={handleTemplateSelect}
-          onResumeChange={(data) => setResumeData(data)}
+          onResumeChange={(data) => {
+            setResumeData(data);
+            // User edited a field — bump the dashboard's "Updated X ago"
+            // for the active resume. Programmatic loads (initial mount,
+            // switching resumes) go through setResumeData directly and
+            // don't bump the timestamp.
+            persistEditedAt();
+          }}
           onCompile={triggerCompile}
           onDownloadPdf={handleDownloadPdf}
           onPageChange={goToPage}

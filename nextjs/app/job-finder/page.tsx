@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useApplications } from "@/hooks/useApplications";
 import FeedbackBanner from "@/components/job-finder/FeedbackBanner";
 import JobSearchForm from "@/components/job-finder/JobSearchForm";
@@ -11,6 +12,16 @@ import { useJobFinder } from "@/hooks/useJobFinder";
 
 
 export default function JobFinderPage() {
+  // Gate the dynamic content on mount: useJobFinder seeds its state from
+  // localStorage in its initial render, which differs between SSR (no
+  // localStorage → empty state) and the first client render (persisted
+  // state). Rendering nothing until mount keeps both sides identical and
+  // avoids the hydration mismatch React 19 / Next 16 flags.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const {
     q,
     loc,
@@ -25,6 +36,7 @@ export default function JobFinderPage() {
     sourceLimits,
     scoringJobs,
     addedToGraph,
+    addedToGraphByResume,
     addingToGraph,
     removingFromGraph,
     setQ,
@@ -43,6 +55,25 @@ export default function JobFinderPage() {
   } = useJobFinder();
 
   const { saveApplication, isApplied } = useApplications();
+
+  if (!mounted) {
+    // SSR / first-client-render skeleton. Static markup only, so SSR and
+    // hydration agree. The real UI renders right after mount once
+    // localStorage-derived state is available.
+    return (
+      <main className="mx-auto max-w-400">
+        <h1 className="text-[40px] font-semibold tracking-tight heading-gradient mb-2">
+          Job Finder
+        </h1>
+        <p className="text-[15px] text-muted mb-6">
+          Browse job postings from multiple sources with ATS scoring based on
+          your selected resume.
+        </p>
+        <div className="text-sm text-muted">Loading…</div>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto max-w-400">
       <h1 className="text-[40px] font-semibold tracking-tight heading-gradient mb-2">
@@ -91,7 +122,9 @@ export default function JobFinderPage() {
               hasMoreJobs={hasMoreJobs[source.key]}
               sourceLimit={sourceLimits[source.key]}
               selectedResumeId={selectedResume?.resume_id ?? null}
+              availableResumes={availableResumes}
               addedToGraph={addedToGraph}
+              addedToGraphByResume={addedToGraphByResume}
               addingToGraph={addingToGraph}
               removingFromGraph={removingFromGraph}
               scoringJobs={scoringJobs}

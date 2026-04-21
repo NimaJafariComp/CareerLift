@@ -15,8 +15,13 @@ from app.services.job_sources import (
     WeWorkRemotelyClient,
 )
 from app.core.config import settings
+from app.core.auth import get_current_user
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class ATSCalculationRequest(BaseModel):

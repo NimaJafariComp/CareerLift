@@ -1,12 +1,17 @@
 """LaTeX resume builder API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
+from app.core.auth import get_current_user
 from app.schemas.latex import CompileRequest, TemplateInfo
 from app.services.latex_service import compile_latex, compile_latex_preview
 
-router = APIRouter(prefix="/api/latex", tags=["latex"])
+router = APIRouter(
+    prefix="/api/latex",
+    tags=["latex"],
+    dependencies=[Depends(get_current_user)],
+)
 
 TEMPLATES: list[TemplateInfo] = [
     TemplateInfo(

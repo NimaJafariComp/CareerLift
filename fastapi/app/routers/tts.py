@@ -5,15 +5,20 @@ import logging
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.core.auth import get_current_user
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/tts", tags=["tts"])
+router = APIRouter(
+    prefix="/api/tts",
+    tags=["tts"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 async def warmup_kokoro(max_attempts: int = 30, delay: float = 2.0) -> None:

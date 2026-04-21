@@ -8,7 +8,8 @@ from .routers import job as jobs_router
 
 from app.core.config import settings
 from app.core.database import neo4j_db
-from app.routers import career, resume, ollama, latex, interview, tts
+from app.core.auth import bootstrap_seed_user, migrate_orphans_to_seed_user
+from app.routers import career, resume, ollama, latex, interview, tts, auth as auth_router
 from app.routers.tts import warmup_kokoro
 
 
@@ -19,6 +20,14 @@ async def lifespan(app: FastAPI):
     print("Starting CareerLift Backend...")
     await neo4j_db.connect()
     await neo4j_db.initialize_schema()
+
+    # Bootstrap the seed user (if BOOTSTRAP_USER_* env vars set) and
+    # retroactively assign existing graph data to it. Idempotent.
+    async with neo4j_db.session() as session:
+        seed = await bootstrap_seed_user(session)
+        if seed and seed.get("id"):
+            await migrate_orphans_to_seed_user(session, seed["id"])
+
     # Warm Kokoro TTS in the background so the first real request is fast.
     # Fire-and-forget: don't block startup on it.
     kokoro_warmup_task = asyncio.create_task(warmup_kokoro())
@@ -57,6 +66,7 @@ app.include_router(ollama.router)
 app.include_router(latex.router)
 app.include_router(interview.router)
 app.include_router(tts.router)
+app.include_router(auth_router.router)
 
 
 @app.get("/")

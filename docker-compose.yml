@@ -42,14 +42,52 @@ services:
       retries: 5
       start_period: 30s
 
+  # Kokoro TTS — the `cpu` and `gpu` profiles are mutually exclusive.
+  # Both services share a network alias of `kokoro`, so fastapi's
+  # `KOKORO_URL=http://kokoro:8880` resolves regardless of which one is up.
+  # Activate at startup by setting COMPOSE_PROFILES in .env, e.g.
+  #   COMPOSE_PROFILES=cpu   (default; multi-arch image, ARM64-native on Mac)
+  #   COMPOSE_PROFILES=gpu   (NVIDIA CUDA; requires nvidia-container-toolkit)
+  # Or on the command line:
+  #   docker compose --profile gpu up -d
+  # Run scripts/kokoro-detect.sh for a recommendation tailored to the host.
   kokoro:
     image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    profiles: ["cpu"]
     ports:
       - "8880:8880"
     volumes:
       - kokoro_data:/app/api/src/models
     networks:
-      - network
+      network:
+        aliases: [kokoro]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8880/v1/audio/voices >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  kokoro-gpu:
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    profiles: ["gpu"]
+    environment:
+      - USE_GPU=true
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8880:8880"
+    volumes:
+      - kokoro_data:/app/api/src/models
+    networks:
+      network:
+        aliases: [kokoro]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8880/v1/audio/voices >/dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -71,6 +109,12 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL}
       - KOKORO_URL=http://kokoro:8880
       - KOKORO_VOICE=${KOKORO_VOICE:-af_heart}
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      - AUTH_JWT_ISSUER=${AUTH_JWT_ISSUER:-careerlift}
+      - AUTH_JWT_TTL_HOURS=${AUTH_JWT_TTL_HOURS:-720}
+      - BOOTSTRAP_USER_EMAIL=${BOOTSTRAP_USER_EMAIL:-user@careerlift.local}
+      - BOOTSTRAP_USER_PASSWORD=${BOOTSTRAP_USER_PASSWORD}
+      - BOOTSTRAP_USER_NAME=${BOOTSTRAP_USER_NAME:-user}
       - USAJOBS_API_KEY=${USAJOBS_API_KEY}
       - USAJOBS_EMAIL=${USAJOBS_EMAIL}
       - ADZUNA_APP_ID=${ADZUNA_APP_ID}
@@ -110,6 +154,18 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NODE_ENV=development
+      - AUTH_URL=${AUTH_URL:-http://localhost:3000}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET}
+      - AUTH_JWT_ISSUER=${AUTH_JWT_ISSUER:-careerlift}
+      - AUTH_JWT_TTL_HOURS=${AUTH_JWT_TTL_HOURS:-720}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+      - MICROSOFT_OAUTH_CLIENT_ID=${MICROSOFT_OAUTH_CLIENT_ID}
+      - MICROSOFT_OAUTH_CLIENT_SECRET=${MICROSOFT_OAUTH_CLIENT_SECRET}
+      - MICROSOFT_OAUTH_TENANT_ID=${MICROSOFT_OAUTH_TENANT_ID:-common}
+      - INTERNAL_API_URL=http://fastapi:8000
     volumes:
       - ./nextjs:/app
       - nextjs_node_modules:/app/node_modules

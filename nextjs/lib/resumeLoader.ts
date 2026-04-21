@@ -6,6 +6,20 @@ export const LAST_RESUME_KEY = "careerlift:lastResume";
 export const RESUME_BUILDER_KEY = "careerlift:resumeBuilder";
 export const RESUME_UPDATED_EVENT = "careerlift:resume-updated";
 
+/** Display label combining the human-entered resume name with a short id
+ *  suffix so users can disambiguate same-named resumes (e.g.
+ *  `Spring 2026 SWE — #a73a4f`). */
+export function formatResumeLabel(input: {
+  resume_name?: string | unknown;
+  resume_id?: string;
+  filename?: string;
+}): string {
+  const name = asString(input.resume_name) || asString(input.filename) || "Unnamed";
+  const id = input.resume_id || "";
+  if (!id) return name;
+  return `${name} — #${id.slice(0, 6)}`;
+}
+
 export interface StoredResume {
   filename: string;
   text_length: number;
@@ -74,6 +88,12 @@ export async function loadResumeById(
   if (!match) throw new Error("Resume not found");
   const raw = await fetchResumeGraph(match.person_name);
   const graph = normalizeGraphData(raw);
+  // storedAt represents the last *edit* time, so the dashboard's "Updated X
+  // ago" reflects real edits and not the moment the user clicked a card.
+  // Seed it from the backend's updated_at; user edits in Resume Lab will
+  // bump it via persistEditedAt() below.
+  const updated = match.updated_at ? Date.parse(match.updated_at) : NaN;
+  const storedAt = Number.isFinite(updated) ? updated : Date.now();
   return {
     filename: asString(match.resume_name) || "resume",
     text_length: 0,
@@ -82,8 +102,26 @@ export async function loadResumeById(
     person_name: asString(match.person_name),
     resume_name: asString(match.resume_name),
     resume_id: match.resume_id,
-    storedAt: Date.now(),
+    storedAt,
   };
+}
+
+/** Bump only the `storedAt` of the active resume in localStorage so the
+ *  dashboard's "Updated X ago" reflects a fresh user edit. No-op if no
+ *  active resume is cached. */
+export function persistEditedAt(at: number = Date.now()): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LAST_RESUME_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.graph_data?.person) return;
+    parsed.storedAt = at;
+    localStorage.setItem(LAST_RESUME_KEY, JSON.stringify(parsed));
+    window.dispatchEvent(new CustomEvent(RESUME_UPDATED_EVENT));
+  } catch {
+    /* noop */
+  }
 }
 
 export function persistStoredResume(stored: StoredResume): void {

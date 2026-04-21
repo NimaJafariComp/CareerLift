@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { apiAxios } from "@/lib/apiClient";
+import { useSession } from "next-auth/react";
 
 interface OllamaStatusData {
   current_model: string;
@@ -22,6 +24,7 @@ function extractErrorMessage(err: unknown, fallback: string) {
 }
 
 export default function OllamaStatus() {
+  const { status: sessionStatus } = useSession();
   const [status, setStatus] = useState<OllamaStatusData | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [showSigninModal, setShowSigninModal] = useState(false);
@@ -34,10 +37,12 @@ export default function OllamaStatus() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
     fetchStatus();
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus]);
 
   useEffect(() => {
     // Auto-show modal once per page load when signin is required
@@ -50,9 +55,13 @@ export default function OllamaStatus() {
     }
   }, [status, restarting]);
 
+  // Hide the badge entirely until the user is authenticated. Important: this
+  // gate must run AFTER all hooks above to satisfy the Rules of Hooks.
+  if (sessionStatus !== "authenticated") return null;
+
   const fetchStatus = async () => {
     try {
-      const response = await axios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
+      const response = await apiAxios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
       setStatus(response.data);
       setErrorMsg(null);
     } catch (err: any) {
@@ -72,7 +81,7 @@ export default function OllamaStatus() {
     setShowTooltip(false);
     try {
       // Run 'ollama signin' command to get signin URL
-      const response = await axios.post(`${API_URL}/api/ollama/signin`);
+      const response = await apiAxios.post(`${API_URL}/api/ollama/signin`);
       const signinUrl = response.data.signin_url;
 
       // Automatically open browser to signin URL
@@ -87,7 +96,7 @@ export default function OllamaStatus() {
       // Poll status every 3 seconds to detect when signin is complete
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await axios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
+          const statusResponse = await apiAxios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
 
           // If no longer requires signin, user has completed authentication
           if (!statusResponse.data.signin_required) {
@@ -117,13 +126,13 @@ export default function OllamaStatus() {
   const pullModel = async () => {
     setPullingModel(true);
     try {
-      await axios.post(`${API_URL}/api/ollama/pull`);
+      await apiAxios.post(`${API_URL}/api/ollama/pull`);
       setErrorMsg(null);
 
       // Poll status until model becomes available
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await axios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
+          const statusResponse = await apiAxios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
           setStatus(statusResponse.data);
 
           // If model is available, stop polling
@@ -158,7 +167,7 @@ export default function OllamaStatus() {
     setShowSigninModal(false);
     try {
       // Run 'ollama signin' command to get signin URL
-      const response = await axios.post(`${API_URL}/api/ollama/signin`);
+      const response = await apiAxios.post(`${API_URL}/api/ollama/signin`);
       const signinUrl = response.data.signin_url;
 
       if (signinUrl) {
@@ -171,7 +180,7 @@ export default function OllamaStatus() {
       // Poll status every 3 seconds to detect when signin is complete
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await axios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
+          const statusResponse = await apiAxios.get<OllamaStatusData>(`${API_URL}/api/ollama/status`);
 
           // If no longer requires signin, user has completed authentication
           if (!statusResponse.data.signin_required) {

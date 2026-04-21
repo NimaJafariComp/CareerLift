@@ -101,128 +101,132 @@ Return JSON with this exact structure:
 
         return validated.model_dump()
 
-    async def create_resume_subgraph(self, db, graph_data: Dict[str, Any]) -> int:
+    async def create_resume_subgraph(
+        self,
+        db,
+        graph_data: Dict[str, Any],
+        *,
+        resume_id: str,
+        user_id: str,
+    ) -> int:
         """
         Create a subgraph in Neo4j from structured resume data.
 
-        This method is idempotent - uploading the same resume multiple times
-        will not create duplicates. All node types (Person, Skill, Experience,
-        Education) use MERGE based on their content to prevent duplicate nodes.
-        Existing relationships are deleted and recreated to ensure accuracy.
+        Skills, experiences, and education link DIRECTLY to the Resume
+        (HAS_SKILL/HAS_EXPERIENCE/HAS_EDUCATION) so they're scoped per
+        resume rather than per person. Person is also created and OWNED
+        by the user so the same name across users doesn't collide.
 
-        Args:
-            db: Neo4j database session
-            graph_data: Structured data from transform_resume_to_graph
-
-        Returns:
-            Number of nodes created
+        Idempotent: re-running for the same resume_id replaces edges
+        without duplicating shared content nodes.
         """
         nodes_created = 0
 
-        # Create Person node
         person = graph_data.get("person", {})
         person_name = person.get("name", "Unknown")
 
+        # MERGE Person scoped under the user via :OWNS, then refresh Resume
+        # contact info on the Person.
         person_query = """
-        MERGE (p:Person {name: $name})
+        MATCH (u:User {id: $user_id})
+        MERGE (u)-[:OWNS]->(p:Person {name: $name})
         SET p.email = $email,
             p.phone = $phone,
             p.location = $location,
             p.updated_at = datetime()
+        WITH p
+        MATCH (r:Resume {id: $resume_id})
+        MERGE (r)-[:BELONGS_TO]->(p)
         RETURN p
         """
-
-        result = await db.run(person_query,
-                             name=person_name,
-                             email=person.get("email"),
-                             phone=person.get("phone"),
-                             location=person.get("location"))
+        result = await db.run(
+            person_query,
+            user_id=user_id,
+            resume_id=resume_id,
+            name=person_name,
+            email=person.get("email"),
+            phone=person.get("phone"),
+            location=person.get("location"),
+        )
         summary = await result.consume()
         nodes_created += summary.counters.nodes_created
 
-        # Delete existing relationships (but not the nodes themselves)
-        # This allows shared experience/education nodes across people
-        delete_rel_query = """
-        MATCH (p:Person {name: $person_name})-[r:HAS_EXPERIENCE]->(e:Experience)
-        DELETE r
-        """
-        await db.run(delete_rel_query, person_name=person_name)
+        # Replace any existing per-resume edges so re-uploads stay clean.
+        await db.run(
+            """
+            MATCH (r:Resume {id: $resume_id})-[rel:HAS_SKILL|HAS_EXPERIENCE|HAS_EDUCATION]->()
+            DELETE rel
+            """,
+            resume_id=resume_id,
+        )
 
-        delete_edu_rel_query = """
-        MATCH (p:Person {name: $person_name})-[r:HAS_EDUCATION]->(ed:Education)
-        DELETE r
-        """
-        await db.run(delete_edu_rel_query, person_name=person_name)
-
-        # Create Skill nodes and relationships
-        skills = graph_data.get("skills", [])
-        for skill in skills:
+        # Skills (Resume->Skill)
+        for skill in graph_data.get("skills", []) or []:
             if isinstance(skill, str) and skill.strip():
-                skill_query = """
-                MERGE (s:Skill {name: $skill_name})
-                WITH s
-                MATCH (p:Person {name: $person_name})
-                MERGE (p)-[r:HAS_SKILL]->(s)
-                SET r.created_at = coalesce(r.created_at, datetime())
-                RETURN s
-                """
-                result = await db.run(skill_query,
-                                     skill_name=skill.strip(),
-                                     person_name=person_name)
+                result = await db.run(
+                    """
+                    MERGE (s:Skill {name: $skill_name})
+                    WITH s
+                    MATCH (r:Resume {id: $resume_id})
+                    MERGE (r)-[rel:HAS_SKILL]->(s)
+                    SET rel.created_at = coalesce(rel.created_at, datetime())
+                    RETURN s
+                    """,
+                    skill_name=skill.strip(),
+                    resume_id=resume_id,
+                )
                 summary = await result.consume()
                 nodes_created += summary.counters.nodes_created
 
-        # Create Experience nodes and relationships
-        # Use MERGE to prevent duplicate experiences based on content
-        experiences = graph_data.get("experiences", [])
-        for exp in experiences:
+        # Experiences (Resume->Experience)
+        for exp in graph_data.get("experiences", []) or []:
             if isinstance(exp, dict):
-                exp_query = """
-                MERGE (e:Experience {
-                    title: $title,
-                    company: $company,
-                    duration: $duration,
-                    description: $description
-                })
-                ON CREATE SET e.created_at = datetime()
-                WITH e
-                MATCH (p:Person {name: $person_name})
-                MERGE (p)-[r:HAS_EXPERIENCE]->(e)
-                ON CREATE SET r.created_at = datetime()
-                RETURN e
-                """
-                result = await db.run(exp_query,
-                                     title=exp.get("title", ""),
-                                     company=exp.get("company", ""),
-                                     duration=exp.get("duration", ""),
-                                     description=exp.get("description", ""),
-                                     person_name=person_name)
+                result = await db.run(
+                    """
+                    MERGE (e:Experience {
+                        title: $title,
+                        company: $company,
+                        duration: $duration,
+                        description: $description
+                    })
+                    ON CREATE SET e.created_at = datetime()
+                    WITH e
+                    MATCH (r:Resume {id: $resume_id})
+                    MERGE (r)-[rel:HAS_EXPERIENCE]->(e)
+                    ON CREATE SET rel.created_at = datetime()
+                    RETURN e
+                    """,
+                    title=exp.get("title", ""),
+                    company=exp.get("company", ""),
+                    duration=exp.get("duration", ""),
+                    description=exp.get("description", ""),
+                    resume_id=resume_id,
+                )
                 summary = await result.consume()
                 nodes_created += summary.counters.nodes_created
 
-        # Create Education nodes and relationships
-        # Use MERGE to prevent duplicate education based on content
-        education = graph_data.get("education", [])
-        for edu in education:
+        # Education (Resume->Education)
+        for edu in graph_data.get("education", []) or []:
             if isinstance(edu, dict):
-                edu_query = """
-                MERGE (e:Education {
-                    degree: $degree,
-                    institution: $institution,
-                    year: $year
-                })
-                ON CREATE SET e.created_at = datetime()
-                WITH e
-                MATCH (p:Person {name: $person_name})
-                MERGE (p)-[r:HAS_EDUCATION]->(e)
-                ON CREATE SET r.created_at = datetime()
-                RETURN e
-                """
-                result = await db.run(edu_query,
-                                     degree=edu.get("degree", ""),
-                                     institution=edu.get("institution", ""),
-                                     year=edu.get("year", ""),
-                                     person_name=person_name)
+                result = await db.run(
+                    """
+                    MERGE (e:Education {
+                        degree: $degree,
+                        institution: $institution,
+                        year: $year
+                    })
+                    ON CREATE SET e.created_at = datetime()
+                    WITH e
+                    MATCH (r:Resume {id: $resume_id})
+                    MERGE (r)-[rel:HAS_EDUCATION]->(e)
+                    ON CREATE SET rel.created_at = datetime()
+                    RETURN e
+                    """,
+                    degree=edu.get("degree", ""),
+                    institution=edu.get("institution", ""),
+                    year=edu.get("year", ""),
+                    resume_id=resume_id,
+                )
                 summary = await result.consume()
                 nodes_created += summary.counters.nodes_created
 

@@ -1,5 +1,6 @@
 """Ollama service API endpoints."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from app.core.auth import get_current_user
 from app.core.config import settings
 import httpx
 import docker
@@ -7,7 +8,11 @@ import asyncio
 import re
 
 
-router = APIRouter(prefix="/api/ollama", tags=["ollama"])
+router = APIRouter(
+    prefix="/api/ollama",
+    tags=["ollama"],
+    dependencies=[Depends(get_current_user)],
+)
 
 OLLAMA_CONTAINER_LABELS = {"com.docker.compose.service": "ollama"}
 

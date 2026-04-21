@@ -54,10 +54,22 @@ class Neo4jConnection:
     async def initialize_schema(self):
         """Initialize Neo4j schema with constraints and indexes."""
         async with self.session() as session:
-            # Create constraint for Person.name (unique identifier)
+            # Person.name is no longer globally unique — Persons are now
+            # scoped under a User via :OWNS. Drop the legacy constraint if
+            # present (idempotent).
             await session.run("""
-                CREATE CONSTRAINT person_name_unique IF NOT EXISTS
-                FOR (p:Person) REQUIRE p.name IS UNIQUE
+                DROP CONSTRAINT person_name_unique IF EXISTS
+            """)
+
+            # User constraints
+            await session.run("""
+                CREATE CONSTRAINT user_id_unique IF NOT EXISTS
+                FOR (u:User) REQUIRE u.id IS UNIQUE
+            """)
+
+            await session.run("""
+                CREATE CONSTRAINT user_email_unique IF NOT EXISTS
+                FOR (u:User) REQUIRE u.email IS UNIQUE
             """)
 
             # Create constraint for Resume.id (unique identifier)

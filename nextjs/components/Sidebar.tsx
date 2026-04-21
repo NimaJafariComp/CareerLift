@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import React, { useEffect, useState, type ReactNode } from "react";
 
 interface NavItem {
@@ -123,6 +124,47 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/** Stylized "CL" monogram. Rounded-square background in the app's accent
+ *  gradient with a hand-drawn C arc + L stroke, the L's foot ticking upward
+ *  to evoke "lift". */
+function CLLogo({ size = 32, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 64 64"
+      width={size}
+      height={size}
+      role="img"
+      aria-label="CareerLift"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="cl-logo-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="100%" stopColor="var(--accent-strong, var(--accent))" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#cl-logo-bg)" />
+      {/* C: open arc on the left */}
+      <path
+        d="M 32 18 a 14 14 0 1 0 0 28"
+        fill="none"
+        stroke="white"
+        strokeWidth="6"
+        strokeLinecap="round"
+      />
+      {/* L: vertical down + horizontal right with a small upward tick */}
+      <path
+        d="M 38 18 v 26 h 12 l 0 -3"
+        fill="none"
+        stroke="white"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function SidebarNav({
   pathname,
   collapsed,
@@ -172,33 +214,90 @@ function DesktopSidebar({
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
+  const { status: sessionStatus } = useSession();
+  const isAuthenticated = sessionStatus === "authenticated";
+  // When the user isn't logged in we always render the sidebar collapsed
+  // (logo only) and hide the collapse toggle.
+  const effectivelyCollapsed = !isAuthenticated || collapsed;
+
   return (
     <aside
       className={`hidden shrink-0 py-8 transition-all duration-200 lg:flex lg:flex-col lg:gap-8 glass ${
-        collapsed ? "lg:w-[68px] lg:px-3" : "lg:w-72 lg:px-6"
+        effectivelyCollapsed ? "lg:w-[68px] lg:px-3" : "lg:w-72 lg:px-6"
       }`}
     >
-      <div className="flex items-center justify-between">
-        {!collapsed && <div className="brand select-none">CareerLift</div>}
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          className="rounded-md p-1.5 text-muted transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-foreground"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <CollapseIcon collapsed={collapsed} />
-        </button>
-      </div>
-
-      <SidebarNav pathname={pathname} collapsed={collapsed} />
-
-      {!collapsed && (
-        <div className="mt-auto text-[10px] uppercase tracking-[0.2em] text-muted">
-          Career workspace
+      {effectivelyCollapsed ? (
+        <div className="flex flex-col items-center gap-2">
+          <CLLogo size={36} />
+          {isAuthenticated && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              className="rounded-md p-1.5 text-muted transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-foreground"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <CollapseIcon collapsed={collapsed} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CLLogo size={28} />
+            <div className="brand select-none">CareerLift</div>
+          </div>
+          {isAuthenticated && (
+            <button
+              type="button"
+              onClick={onToggleCollapsed}
+              className="rounded-md p-1.5 text-muted transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-foreground"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <CollapseIcon collapsed={collapsed} />
+            </button>
+          )}
         </div>
       )}
+
+      <SidebarNav pathname={pathname} collapsed={effectivelyCollapsed} />
+
+      <div className="mt-auto flex flex-col gap-2">
+        <UserBadge collapsed={effectivelyCollapsed} />
+        {!effectivelyCollapsed && (
+          <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+            Career workspace
+          </div>
+        )}
+      </div>
     </aside>
+  );
+}
+
+function UserBadge({ collapsed }: { collapsed: boolean }) {
+  const { data: session, status } = useSession();
+  if (status !== "authenticated") return null;
+  const email = session.user?.email || "user";
+  const name = session.user?.name || email;
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-[var(--border-color)] p-2">
+      {!collapsed && (
+        <div className="min-w-0">
+          <p className="truncate text-[12px] font-medium text-foreground">{name}</p>
+          <p className="truncate text-[10px] text-muted">{email}</p>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => signOut({ callbackUrl: "/login" })}
+        className="rounded px-2 py-1 text-[11px] font-semibold text-muted transition-colors hover:bg-[rgba(255,255,255,0.08)] hover:text-foreground"
+        title="Sign out"
+        aria-label="Sign out"
+      >
+        {collapsed ? "⏻" : "Sign out"}
+      </button>
+    </div>
   );
 }
 
@@ -217,7 +316,10 @@ function MobileSidebar({
     <>
       <div className="sticky top-0 z-40 border-b border-[var(--border-color)] bg-[color:color-mix(in_oklab,var(--background)_82%,transparent)] backdrop-blur lg:hidden">
         <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-          <div className="brand select-none text-[18px]">CareerLift</div>
+          <div className="flex items-center gap-2">
+            <CLLogo size={26} />
+            <div className="brand select-none text-[18px]">CareerLift</div>
+          </div>
           <button
             type="button"
             onClick={onOpen}
@@ -239,7 +341,10 @@ function MobileSidebar({
           />
           <aside className="fixed inset-y-0 left-0 z-50 flex w-[min(84vw,320px)] flex-col gap-6 border-r border-[var(--border-color)] px-5 py-6 glass shadow-2xl">
             <div className="flex items-center justify-between">
-              <div className="brand select-none text-[18px]">CareerLift</div>
+              <div className="flex items-center gap-2">
+                <CLLogo size={26} />
+                <div className="brand select-none text-[18px]">CareerLift</div>
+              </div>
               <button
                 type="button"
                 onClick={onClose}

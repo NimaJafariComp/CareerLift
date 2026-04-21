@@ -1,6 +1,8 @@
-"""Resume processing API endpoints."""
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Body, Form
+"""Resume processing API endpoints. Every endpoint is scoped to the
+currently-authenticated user via :User-[:OWNS]->(:Resume) etc."""
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.services.resume_processor import resume_processor
 from app.services.knowledge_graph_service import (
     ResumeGraphExtractionError,
@@ -8,7 +10,6 @@ from app.services.knowledge_graph_service import (
 )
 from app.services.ats_service import ats_service
 from app.schemas.resume import (
-    ResumeCreate,
     ResumeInfo,
     ResumeList,
     SavedJobCreate,
@@ -16,9 +17,8 @@ from app.schemas.resume import (
     SavedJobsList,
     SkillGapAnalysis,
 )
-from typing import List, Optional
+from typing import Optional
 import uuid
-from datetime import datetime
 
 
 router = APIRouter(prefix="/api/resume", tags=["resume"])
@@ -28,18 +28,25 @@ router = APIRouter(prefix="/api/resume", tags=["resume"])
 async def upload_resume(
     file: UploadFile = File(...),
     person_name: str = Form(""),
-    resume_name: str = Form("Default Resume"),
-    db=Depends(get_db)
+    resume_name: str = Form(""),
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Upload and process a resume file with multiple resume support.
 
     Supports: .txt, .md, .pdf, .doc, .docx
-
-    Extracts text, transforms to knowledge graph, and stores in Neo4j.
-    Each resume gets a unique ID and can be associated with a person.
+    The Resume becomes :OWNS-owned by the current user; the resulting
+    skill/experience/education subgraph is linked to this Resume only.
     """
-    # Validate file type
+    user_id = current_user["id"]
+
+    if not resume_name or not resume_name.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="A resume name is required (e.g. 'Spring 2026 SWE').",
+        )
+
     allowed_extensions = {'.txt', '.md', '.pdf', '.doc', '.docx'}
     file_ext = '.' + file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
 
@@ -49,11 +56,9 @@ async def upload_resume(
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}"
         )
 
-    # Read file content
     file_content = await file.read()
 
     try:
-        # Extract text from file
         text = await resume_processor.extract_text_from_file(file_content, file.filename)
 
         if not text or len(text.strip()) < 10:
@@ -62,28 +67,27 @@ async def upload_resume(
                 detail="Could not extract meaningful text from the file"
             )
 
-        # Generate unique resume ID
         resume_id = str(uuid.uuid4())
-
-        # Transform to knowledge graph structure first to extract person info
         graph_data = await knowledge_graph_service.transform_resume_to_graph(text)
 
-        # Decide which person name to use: prefer provided person_name (if non-empty),
-        # otherwise fallback to LLM extracted name in graph_data.
-        extracted_person_name = graph_data.get("person", {}).get("name") if graph_data.get("person") else None
-        final_person_name = person_name.strip() if person_name and person_name.strip() else (extracted_person_name or "Unknown")
-
-        # Ensure graph_data person object exists and has the final name
+        extracted_person_name = (
+            graph_data.get("person", {}).get("name") if graph_data.get("person") else None
+        )
+        final_person_name = (
+            person_name.strip()
+            if person_name and person_name.strip()
+            else (extracted_person_name or "Unknown")
+        )
         if not graph_data.get("person"):
             graph_data["person"] = {"name": final_person_name}
         else:
             graph_data["person"]["name"] = final_person_name
 
-        # Use provided resume name
-        final_resume_name = resume_name
+        final_resume_name = resume_name.strip()
 
-        # Create Resume node in Neo4j
+        # Create the Resume node and link it to the owning user.
         resume_query = """
+        MATCH (u:User {id: $user_id})
         CREATE (r:Resume {
             id: $resume_id,
             name: $resume_name,
@@ -93,29 +97,25 @@ async def upload_resume(
             created_at: datetime(),
             updated_at: datetime()
         })
+        MERGE (u)-[:OWNS]->(r)
         RETURN r
         """
-
         result = await db.run(
             resume_query,
+            user_id=user_id,
             resume_id=resume_id,
             resume_name=final_resume_name,
             person_name=final_person_name,
             text=text,
-            filename=file.filename
+            filename=file.filename,
         )
         await result.consume()
 
-        # Create subgraph in Neo4j and link to Resume
-        nodes_created = await knowledge_graph_service.create_resume_subgraph(db, graph_data)
-
-        # Link Resume to Person
-        link_query = """
-        MATCH (r:Resume {id: $resume_id})
-        MATCH (p:Person {name: $person_name})
-        MERGE (r)-[:BELONGS_TO]->(p)
-        """
-        await db.run(link_query, resume_id=resume_id, person_name=final_person_name)
+        # Build per-resume subgraph (Skills/Experiences/Education hang off
+        # this Resume; Person is created/MERGEd under the user).
+        nodes_created = await knowledge_graph_service.create_resume_subgraph(
+            db, graph_data, resume_id=resume_id, user_id=user_id
+        )
 
         return {
             "message": "Resume processed successfully",
@@ -125,14 +125,13 @@ async def upload_resume(
             "filename": file.filename,
             "text_length": len(text),
             "nodes_created": nodes_created,
-            "graph_data": graph_data
+            "graph_data": graph_data,
         }
 
     except ResumeGraphExtractionError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except ValueError as e:
         error_msg = str(e)
-        # Check if this is an Ollama auth error
         if error_msg.startswith("OLLAMA_AUTH_REQUIRED:"):
             signin_url = error_msg.split(":", 1)[1] if ":" in error_msg else None
             raise HTTPException(
@@ -140,8 +139,8 @@ async def upload_resume(
                 detail={
                     "error": "Ollama authentication required",
                     "signin_url": signin_url,
-                    "message": "Please sign in to Ollama to process resumes"
-                }
+                    "message": "Please sign in to Ollama to process resumes",
+                },
             )
         raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
@@ -149,58 +148,61 @@ async def upload_resume(
 
 
 @router.get("/graph/{person_name}")
-async def get_resume_graph(person_name: str, db=Depends(get_db)):
-    """
-    Retrieve the resume subgraph for a person from Neo4j.
-
-    Returns the person node and all related skills, experiences, education, saved_jobs, and resumes.
-    """
+async def get_resume_graph(
+    person_name: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Return the user's most-recent Resume subgraph for the given person.
+    Skills/Experiences/Education are now per-Resume."""
     query = """
-    MATCH (p:Person {name: $person_name})
-    OPTIONAL MATCH (p)-[:HAS_SKILL]->(s:Skill)
-    OPTIONAL MATCH (p)-[:HAS_EXPERIENCE]->(e:Experience)
-    OPTIONAL MATCH (p)-[:HAS_EDUCATION]->(ed:Education)
-    OPTIONAL MATCH (p)<-[:BELONGS_TO]-(r:Resume)-[:SAVED_JOB]->(j:JobPosting)
+    MATCH (u:User {id: $user_id})-[:OWNS]->(p:Person {name: $person_name})
+    OPTIONAL MATCH (u)-[:OWNS]->(r:Resume)-[:BELONGS_TO]->(p)
+    WITH p, r ORDER BY r.created_at DESC
+    WITH p, head(collect(r)) AS r
+    OPTIONAL MATCH (r)-[:HAS_SKILL]->(s:Skill)
+    OPTIONAL MATCH (r)-[:HAS_EXPERIENCE]->(e:Experience)
+    OPTIONAL MATCH (r)-[:HAS_EDUCATION]->(ed:Education)
+    OPTIONAL MATCH (r)-[:SAVED_JOB]->(j:JobPosting)
+    OPTIONAL MATCH (u)-[:OWNS]->(allr:Resume)-[:BELONGS_TO]->(p)
     RETURN p,
-           collect(DISTINCT s) as skills,
-           collect(DISTINCT e) as experiences,
-           collect(DISTINCT ed) as education,
-           collect(DISTINCT j) as saved_jobs,
-           collect(DISTINCT r) as resumes
+           collect(DISTINCT s) AS skills,
+           collect(DISTINCT e) AS experiences,
+           collect(DISTINCT ed) AS education,
+           collect(DISTINCT j) AS saved_jobs,
+           collect(DISTINCT allr) AS resumes
     """
 
-    result = await db.run(query, person_name=person_name)
+    result = await db.run(query, user_id=current_user["id"], person_name=person_name)
     record = await result.single()
 
-    if not record:
+    if not record or not record.get("p"):
         raise HTTPException(status_code=404, detail=f"Person '{person_name}' not found")
 
-    person = dict(record["p"]) if record.get("p") else {}
-    skills = [dict(s) for s in record.get("skills", []) if s is not None]
-    experiences = [dict(e) for e in record.get("experiences", []) if e is not None]
-    education = [dict(ed) for ed in record.get("education", []) if ed is not None]
-    saved_jobs = [dict(j) for j in record.get("saved_jobs", []) if j is not None]
-    resumes = [dict(r) for r in record.get("resumes", []) if r is not None]
-
     return {
-        "person": person,
-        "skills": skills,
-        "experiences": experiences,
-        "education": education,
-        "saved_jobs": saved_jobs,
-        "resumes": resumes
+        "person": dict(record["p"]),
+        "skills": [dict(s) for s in record.get("skills", []) if s is not None],
+        "experiences": [dict(e) for e in record.get("experiences", []) if e is not None],
+        "education": [dict(ed) for ed in record.get("education", []) if ed is not None],
+        "saved_jobs": [dict(j) for j in record.get("saved_jobs", []) if j is not None],
+        "resumes": [dict(r) for r in record.get("resumes", []) if r is not None],
     }
 
 
 @router.get("/score/{person_name}")
-async def score_resume_against_jobs(person_name: str, db=Depends(get_db)):
-    # Pull resume graph
+async def score_resume_against_jobs(
+    person_name: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     person_query = """
-    MATCH (p:Person {name: $person_name})
-    OPTIONAL MATCH (p)-[:HAS_SKILL]->(s:Skill)
-    OPTIONAL MATCH (p)-[:HAS_EXPERIENCE]->(e:Experience)
-    OPTIONAL MATCH (p)-[:HAS_EDUCATION]->(ed:Education)
-    OPTIONAL MATCH (p)<-[:BELONGS_TO]-(r:Resume)
+    MATCH (u:User {id: $user_id})-[:OWNS]->(p:Person {name: $person_name})
+    OPTIONAL MATCH (u)-[:OWNS]->(r:Resume)-[:BELONGS_TO]->(p)
+    WITH p, r ORDER BY r.created_at DESC
+    WITH p, head(collect(r)) AS r
+    OPTIONAL MATCH (r)-[:HAS_SKILL]->(s:Skill)
+    OPTIONAL MATCH (r)-[:HAS_EXPERIENCE]->(e:Experience)
+    OPTIONAL MATCH (r)-[:HAS_EDUCATION]->(ed:Education)
     RETURN p,
            collect(DISTINCT s.name) AS skills,
            collect(DISTINCT e.description) AS experiences,
@@ -209,8 +211,10 @@ async def score_resume_against_jobs(person_name: str, db=Depends(get_db)):
            collect(DISTINCT r.text) AS resume_texts
     """
 
-    record = await (await db.run(person_query, person_name=person_name)).single()
-    if not record:
+    record = await (await db.run(
+        person_query, user_id=current_user["id"], person_name=person_name
+    )).single()
+    if not record or not record.get("p"):
         raise HTTPException(status_code=404, detail="Resume not found")
 
     resume_profile = ats_service.build_resume_profile(
@@ -221,11 +225,7 @@ async def score_resume_against_jobs(person_name: str, db=Depends(get_db)):
         resume_text=" ".join(record["resume_texts"] or []),
     )
 
-    # Get all jobs
-    job_query = """
-    MATCH (j:JobPosting)
-    RETURN j
-    """
+    job_query = "MATCH (j:JobPosting) RETURN j"
     result = await db.run(job_query)
 
     jobs = []
@@ -238,15 +238,15 @@ async def score_resume_against_jobs(person_name: str, db=Depends(get_db)):
 
 
 @router.get("/list", response_model=ResumeList)
-async def list_resumes(person_name: Optional[str] = None, db=Depends(get_db)):
-    """
-    List all resumes, optionally filtered by person name.
-
-    Returns resume ID, name, person name, and timestamps.
-    """
+async def list_resumes(
+    person_name: Optional[str] = None,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """List the current user's resumes (optionally filtered by person name)."""
     if person_name:
         query = """
-        MATCH (r:Resume {person_name: $person_name})
+        MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {person_name: $person_name})
         RETURN r.id AS resume_id,
                r.name AS resume_name,
                r.person_name AS person_name,
@@ -254,10 +254,10 @@ async def list_resumes(person_name: Optional[str] = None, db=Depends(get_db)):
                toString(r.updated_at) AS updated_at
         ORDER BY r.created_at DESC
         """
-        result = await db.run(query, person_name=person_name)
+        result = await db.run(query, user_id=current_user["id"], person_name=person_name)
     else:
         query = """
-        MATCH (r:Resume)
+        MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume)
         RETURN r.id AS resume_id,
                r.name AS resume_name,
                r.person_name AS person_name,
@@ -265,7 +265,7 @@ async def list_resumes(person_name: Optional[str] = None, db=Depends(get_db)):
                toString(r.updated_at) AS updated_at
         ORDER BY r.created_at DESC
         """
-        result = await db.run(query)
+        result = await db.run(query, user_id=current_user["id"])
 
     resumes = []
     async for record in result:
@@ -274,27 +274,37 @@ async def list_resumes(person_name: Optional[str] = None, db=Depends(get_db)):
             person_name=record["person_name"],
             resume_name=record["resume_name"],
             created_at=record.get("created_at"),
-            updated_at=record.get("updated_at")
+            updated_at=record.get("updated_at"),
         ))
 
     return ResumeList(resumes=resumes)
 
 
 @router.delete("/{resume_id}")
-async def delete_resume(resume_id: str, db=Depends(get_db)):
-    """
-    Permanently delete a resume and all its relationships from the knowledge graph.
-    """
+async def delete_resume(
+    resume_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Delete one of the current user's resumes."""
     check = await db.run(
-        "MATCH (r:Resume {id: $resume_id}) RETURN r",
-        resume_id=resume_id
+        """
+        MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
+        RETURN r
+        """,
+        user_id=current_user["id"],
+        resume_id=resume_id,
     )
     if not await check.single():
         raise HTTPException(status_code=404, detail="Resume not found")
 
     await db.run(
-        "MATCH (r:Resume {id: $resume_id}) DETACH DELETE r",
-        resume_id=resume_id
+        """
+        MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
+        DETACH DELETE r
+        """,
+        user_id=current_user["id"],
+        resume_id=resume_id,
     )
 
     return {"message": "Resume deleted successfully", "resume_id": resume_id}
@@ -303,89 +313,120 @@ async def delete_resume(resume_id: str, db=Depends(get_db)):
 @router.post("/save-job")
 async def save_job_to_resume(
     data: SavedJobCreate,
-    db=Depends(get_db)
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    """
-    Save a job posting to a resume in the knowledge graph.
+    """Atomic save: MERGE the JobPosting from the request payload, link it to
+    the user (OWNS) and to the resume (SAVED_JOB) in a single transaction.
+    Eliminates the previous race where the JobPosting hadn't yet been
+    committed when the SAVED_JOB rel was attempted."""
+    snapshot = data.job
+    apply_url = snapshot.apply_url if snapshot else data.job_apply_url
+    if not apply_url:
+        raise HTTPException(status_code=400, detail="apply_url is required")
 
-    Creates a SAVED_JOB relationship between Resume and JobPosting.
-    """
-    # Check if resume exists
-    resume_check = await db.run(
-        "MATCH (r:Resume {id: $resume_id}) RETURN r",
-        resume_id=data.resume_id
+    # Confirm the resume belongs to this user.
+    own = await db.run(
+        """
+        MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
+        RETURN r
+        """,
+        user_id=current_user["id"],
+        resume_id=data.resume_id,
     )
-    if not await resume_check.single():
+    if not await own.single():
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    # Check if job exists
-    job_check = await db.run(
-        "MATCH (j:JobPosting {apply_url: $apply_url}) RETURN j",
-        apply_url=data.job_apply_url
-    )
-    if not await job_check.single():
-        raise HTTPException(status_code=404, detail="Job not found")
+    title = snapshot.title if snapshot else None
+    company = snapshot.company if snapshot else None
+    location = snapshot.location if snapshot else None
+    source = snapshot.source if snapshot else None
+    description = snapshot.description if snapshot else None
+    salary_text = snapshot.salary_text if snapshot else None
+    employment_type = snapshot.employment_type if snapshot else None
+    remote = snapshot.remote if snapshot else None
+    posted_at = snapshot.posted_at if snapshot else None
+    source_url = snapshot.source_url if snapshot else None
 
-    # Create SAVED_JOB relationship
     save_query = """
-    MATCH (r:Resume {id: $resume_id})
-    MATCH (j:JobPosting {apply_url: $apply_url})
+    MERGE (j:JobPosting {apply_url: $apply_url})
+      ON CREATE SET j.created_at = datetime()
+    SET j.title         = coalesce($title, j.title),
+        j.company       = coalesce($company, j.company),
+        j.location      = coalesce($location, j.location),
+        j.source        = coalesce($source, j.source),
+        j.description   = coalesce($description, j.description),
+        j.salary_text   = coalesce($salary_text, j.salary_text),
+        j.employment_type = coalesce($employment_type, j.employment_type),
+        j.remote        = coalesce($remote, j.remote),
+        j.posted_at     = coalesce($posted_at, j.posted_at),
+        j.source_url    = coalesce($source_url, j.source_url),
+        j.updated_at    = datetime()
+    WITH j
+    MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
+    MERGE (u)-[:OWNS]->(j)
     MERGE (r)-[s:SAVED_JOB]->(j)
-    SET s.saved_at = datetime(),
-        s.notes = $notes
-    RETURN s
+      ON CREATE SET s.saved_at = datetime()
+    SET s.notes = coalesce($notes, s.notes)
+    RETURN j.apply_url AS apply_url
     """
-
     result = await db.run(
         save_query,
+        user_id=current_user["id"],
         resume_id=data.resume_id,
-        apply_url=data.job_apply_url,
-        notes=data.notes
+        apply_url=apply_url,
+        title=title,
+        company=company,
+        location=location,
+        source=source,
+        description=description,
+        salary_text=salary_text,
+        employment_type=employment_type,
+        remote=remote,
+        posted_at=posted_at,
+        source_url=source_url,
+        notes=data.notes,
     )
-    await result.consume()
+    record = await result.single()
+    if not record:
+        raise HTTPException(status_code=500, detail="Failed to save job")
 
     return {
         "message": "Job saved successfully",
         "resume_id": data.resume_id,
-        "job_url": data.job_apply_url
+        "job_url": record["apply_url"],
     }
 
 
 @router.get("/saved-jobs/{resume_id}", response_model=SavedJobsList)
-async def get_saved_jobs(resume_id: str, db=Depends(get_db)):
-    """
-    Get all saved jobs for a resume with ATS scores.
-    """
-    # Get resume info
+async def get_saved_jobs(
+    resume_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """List saved jobs for a resume the current user owns, with ATS scores."""
     resume_query = """
-    MATCH (r:Resume {id: $resume_id})
+    MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
     RETURN r.name AS resume_name, r.person_name AS person_name
     """
-    resume_result = await db.run(resume_query, resume_id=resume_id)
-    resume_record = await resume_result.single()
-
+    resume_record = await (await db.run(
+        resume_query, user_id=current_user["id"], resume_id=resume_id
+    )).single()
     if not resume_record:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    # Get person's skills for ATS scoring
-    person_query = """
-    MATCH (p:Person {name: $person_name})
-    OPTIONAL MATCH (p)-[:HAS_SKILL]->(s:Skill)
-    OPTIONAL MATCH (p)-[:HAS_EXPERIENCE]->(e:Experience)
-    OPTIONAL MATCH (p)-[:HAS_EDUCATION]->(ed:Education)
-    OPTIONAL MATCH (p)<-[:BELONGS_TO]-(r:Resume {id: $resume_id})
+    profile_query = """
+    MATCH (r:Resume {id: $resume_id})
+    OPTIONAL MATCH (r)-[:HAS_SKILL]->(s:Skill)
+    OPTIONAL MATCH (r)-[:HAS_EXPERIENCE]->(e:Experience)
+    OPTIONAL MATCH (r)-[:HAS_EDUCATION]->(ed:Education)
     RETURN collect(DISTINCT s.name) AS skills,
            collect(DISTINCT e.description) AS experiences,
            collect(DISTINCT e.title) AS experience_titles,
            collect(DISTINCT ed.degree) AS education,
            collect(DISTINCT r.text) AS resume_texts
     """
-    person_result = await db.run(
-        person_query,
-        person_name=resume_record["person_name"],
-        resume_id=resume_id,
-    )
-    person_data = await person_result.single()
+    person_data = await (await db.run(profile_query, resume_id=resume_id)).single()
 
     resume_profile = ats_service.build_resume_profile(
         skills=person_data["skills"] or [],
@@ -395,7 +436,6 @@ async def get_saved_jobs(resume_id: str, db=Depends(get_db)):
         resume_text=" ".join(person_data["resume_texts"] or []),
     )
 
-    # Get saved jobs
     jobs_query = """
     MATCH (r:Resume {id: $resume_id})-[s:SAVED_JOB]->(j:JobPosting)
     RETURN j.title AS title,
@@ -408,20 +448,16 @@ async def get_saved_jobs(resume_id: str, db=Depends(get_db)):
            s.notes AS notes
     ORDER BY s.saved_at DESC
     """
-
     result = await db.run(jobs_query, resume_id=resume_id)
 
     jobs = []
     async for record in result:
-        # Calculate ATS score
-        job_data = {
+        scoring = ats_service.score_resume_to_job(resume_profile, {
             "description": record.get("description", ""),
             "title": record.get("title", ""),
             "company": record.get("company", ""),
             "location": record.get("location", ""),
-        }
-        scoring = ats_service.score_resume_to_job(resume_profile, job_data)
-
+        })
         jobs.append(SavedJobInfo(
             job_title=record["title"],
             company=record.get("company"),
@@ -437,68 +473,64 @@ async def get_saved_jobs(resume_id: str, db=Depends(get_db)):
     return SavedJobsList(
         resume_id=resume_id,
         resume_name=resume_record["resume_name"],
-        jobs=jobs
+        jobs=jobs,
     )
 
 
 @router.delete("/saved-job/{resume_id}/{job_apply_url:path}")
-async def remove_saved_job(resume_id: str, job_apply_url: str, db=Depends(get_db)):
-    """
-    Remove a saved job from a resume.
-    """
+async def remove_saved_job(
+    resume_id: str,
+    job_apply_url: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove a saved job from one of the current user's resumes."""
     query = """
-    MATCH (r:Resume {id: $resume_id})-[s:SAVED_JOB]->(j:JobPosting {apply_url: $apply_url})
+    MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})-[s:SAVED_JOB]->(j:JobPosting {apply_url: $apply_url})
     DELETE s
     RETURN count(s) AS deleted
     """
-
-    result = await db.run(query, resume_id=resume_id, apply_url=job_apply_url)
+    result = await db.run(
+        query,
+        user_id=current_user["id"],
+        resume_id=resume_id,
+        apply_url=job_apply_url,
+    )
     record = await result.single()
-
     if not record or record["deleted"] == 0:
         raise HTTPException(status_code=404, detail="Saved job not found")
-
     return {"message": "Job removed from saved list"}
 
 
 @router.get("/skill-gap-analysis/{resume_id}", response_model=SkillGapAnalysis)
-async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
-    """
-    Perform comprehensive skill gap analysis for a resume based on saved jobs.
-
-    Compares resume skills against requirements across all saved jobs,
-    identifying missing critical skills and providing recommendations.
-    """
-    # Get resume info
+async def analyze_skill_gaps(
+    resume_id: str,
+    db=Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Cross-resume skill gap analysis (saved jobs vs resume skills)."""
     resume_query = """
-    MATCH (r:Resume {id: $resume_id})
+    MATCH (u:User {id: $user_id})-[:OWNS]->(r:Resume {id: $resume_id})
     RETURN r.name AS resume_name, r.person_name AS person_name
     """
-    resume_result = await db.run(resume_query, resume_id=resume_id)
-    resume_record = await resume_result.single()
-
+    resume_record = await (await db.run(
+        resume_query, user_id=current_user["id"], resume_id=resume_id
+    )).single()
     if not resume_record:
         raise HTTPException(status_code=404, detail="Resume not found")
 
-    # Get person's skills for ATS scoring
-    person_query = """
-    MATCH (p:Person {name: $person_name})
-    OPTIONAL MATCH (p)-[:HAS_SKILL]->(s:Skill)
-    OPTIONAL MATCH (p)-[:HAS_EXPERIENCE]->(e:Experience)
-    OPTIONAL MATCH (p)-[:HAS_EDUCATION]->(ed:Education)
-    OPTIONAL MATCH (p)<-[:BELONGS_TO]-(r:Resume {id: $resume_id})
+    profile_query = """
+    MATCH (r:Resume {id: $resume_id})
+    OPTIONAL MATCH (r)-[:HAS_SKILL]->(s:Skill)
+    OPTIONAL MATCH (r)-[:HAS_EXPERIENCE]->(e:Experience)
+    OPTIONAL MATCH (r)-[:HAS_EDUCATION]->(ed:Education)
     RETURN collect(DISTINCT s.name) AS skills,
            collect(DISTINCT e.description) AS experiences,
            collect(DISTINCT e.title) AS experience_titles,
            collect(DISTINCT ed.degree) AS education,
            collect(DISTINCT r.text) AS resume_texts
     """
-    person_result = await db.run(
-        person_query,
-        person_name=resume_record["person_name"],
-        resume_id=resume_id,
-    )
-    person_data = await person_result.single()
+    person_data = await (await db.run(profile_query, resume_id=resume_id)).single()
 
     resume_profile = ats_service.build_resume_profile(
         skills=person_data["skills"] or [],
@@ -508,7 +540,6 @@ async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
         resume_text=" ".join(person_data["resume_texts"] or []),
     )
 
-    # Get saved jobs
     jobs_query = """
     MATCH (r:Resume {id: $resume_id})-[s:SAVED_JOB]->(j:JobPosting)
     RETURN j.title AS title,
@@ -519,25 +550,22 @@ async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
            j.description AS description
     ORDER BY s.saved_at DESC
     """
-
     result = await db.run(jobs_query, resume_id=resume_id)
 
     jobs_data = []
     async for record in result:
-        job_data = {
+        jobs_data.append({
             "description": record.get("description", ""),
             "title": record.get("title", ""),
             "company": record.get("company", ""),
             "location": record.get("location", ""),
-        }
-        jobs_data.append(job_data)
+        })
 
     if not jobs_data:
         raise HTTPException(status_code=400, detail="No saved jobs found for analysis")
 
-    # Analyze skill gaps across all saved jobs
-    all_required_skills = {}  # skill -> count
-    all_preferred_skills = {}  # skill -> count
+    all_required_skills = {}
+    all_preferred_skills = {}
     all_job_skills = set()
     matched_skills = set()
     total_ats_scores = 0
@@ -545,81 +573,54 @@ async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
     for job_data in jobs_data:
         scoring = ats_service.score_resume_to_job(resume_profile, job_data)
         total_ats_scores += scoring["ats_score"]
-
         ats_details = scoring.get("ats_details", {})
 
-        # Track required skills
         if "matched" in ats_details and "required_skills" in ats_details["matched"]:
             matched_skills.update(ats_details["matched"]["required_skills"])
-
         if "missing" in ats_details and "required_skills" in ats_details["missing"]:
             for skill in ats_details["missing"]["required_skills"]:
                 all_required_skills[skill] = all_required_skills.get(skill, 0) + 1
-
         if "missing" in ats_details and "preferred_skills" in ats_details["missing"]:
             for skill in ats_details["missing"]["preferred_skills"]:
                 all_preferred_skills[skill] = all_preferred_skills.get(skill, 0) + 1
-
-        # Track all job skills
         if "job_requirements" in ats_details and "all_skills" in ats_details["job_requirements"]:
             all_job_skills.update(ats_details["job_requirements"]["all_skills"])
 
     job_count = len(jobs_data)
     avg_ats_score = total_ats_scores / job_count if job_count > 0 else 0
 
-    # Categorize skill gaps by importance
     def get_importance(frequency: int) -> str:
         ratio = frequency / job_count
         if ratio >= 0.7:
             return "critical"
-        elif ratio >= 0.4:
+        if ratio >= 0.4:
             return "high"
-        elif ratio >= 0.2:
+        if ratio >= 0.2:
             return "medium"
-        else:
-            return "low"
+        return "low"
 
     missing_required = [
-        {
-            "skill": skill,
-            "frequency": count,
-            "importance": get_importance(count)
-        }
-        for skill, count in sorted(
-            all_required_skills.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        {"skill": s, "frequency": c, "importance": get_importance(c)}
+        for s, c in sorted(all_required_skills.items(), key=lambda x: x[1], reverse=True)
     ]
-
     missing_preferred = [
-        {
-            "skill": skill,
-            "frequency": count,
-            "importance": get_importance(count)
-        }
-        for skill, count in sorted(
-            all_preferred_skills.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        {"skill": s, "frequency": c, "importance": get_importance(c)}
+        for s, c in sorted(all_preferred_skills.items(), key=lambda x: x[1], reverse=True)
     ]
 
-    # Generate recommendations
     recommendations = []
     if missing_required:
-        critical_skills = [s["skill"] for s in missing_required if s["importance"] == "critical"]
-        if critical_skills:
+        critical = [s["skill"] for s in missing_required if s["importance"] == "critical"]
+        if critical:
             recommendations.append(
-                f"Priority: Learn {', '.join(critical_skills[:3])} - these are required by most opportunities"
+                f"Priority: Learn {', '.join(critical[:3])} - these are required by most opportunities"
             )
 
-    high_value_skills = [s["skill"] for s in missing_required[:5] if s["importance"] in ["high", "critical"]]
-    if high_value_skills:
+    high_value = [s["skill"] for s in missing_required[:5] if s["importance"] in ("high", "critical")]
+    if high_value:
         recommendations.append(
-            f"Focus on building expertise in {', '.join(high_value_skills)} to improve competitiveness"
+            f"Focus on building expertise in {', '.join(high_value)} to improve competitiveness"
         )
-
     if missing_preferred:
         top_preferred = [s["skill"] for s in missing_preferred[:3]]
         recommendations.append(
@@ -658,5 +659,5 @@ async def analyze_skill_gaps(resume_id: str, db=Depends(get_db)):
             "missing_required_skills_count": len(all_required_skills),
             "missing_preferred_skills_count": len(all_preferred_skills),
             "critical_skills_to_learn": [s["skill"] for s in missing_required if s["importance"] == "critical"],
-        }
+        },
     )

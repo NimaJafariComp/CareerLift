@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
 
 import type { Resume } from "@/components/job-finder/types";
 import { asString, fetchResumeGraph, getApiBase } from "@/lib/jobFinderApi";
-import { normalizeGraphData } from "@/lib/resumeLoader";
+import { apiAxios } from "@/lib/apiClient";
+import { formatResumeLabel, normalizeGraphData } from "@/lib/resumeLoader";
 import { graphDataToResumeData } from "@/lib/resumeDataMapper";
 import type { TemplateInfo } from "@/types/resume";
 
@@ -59,7 +59,7 @@ export default function ResumeCarousel({
     }
     if (resolvedTemplateId) return;
     const base = getApiBase();
-    axios
+    apiAxios
       .get<TemplateInfo[]>(`${base}/api/latex/templates`)
       .then((res) => {
         const first = res.data?.[0]?.id;
@@ -89,7 +89,7 @@ export default function ResumeCarousel({
           const rawGraph = await fetchResumeGraph(resume.person_name);
           const graph = normalizeGraphData(rawGraph);
           const resumeData = graphDataToResumeData(graph);
-          const response = await axios.post(
+          const response = await apiAxios.post(
             `${base}/api/latex/compile/preview?dpi=72`,
             { template_id: resolvedTemplateId, resume_data: resumeData },
             { responseType: "blob" },
@@ -164,9 +164,9 @@ export default function ResumeCarousel({
               <div className="min-w-0">
                 <p
                   className={`${dimensions.label} font-semibold text-foreground truncate`}
-                  title={asString(resume.resume_name)}
+                  title={formatResumeLabel(resume)}
                 >
-                  {asString(resume.resume_name) || resume.resume_id}
+                  {formatResumeLabel(resume)}
                 </p>
                 <p
                   className="text-[10px] text-muted truncate"

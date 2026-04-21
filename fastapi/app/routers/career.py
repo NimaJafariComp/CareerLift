@@ -4,10 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from neo4j import AsyncSession
 
 from app.core.database import get_db
+from app.core.auth import get_current_user
 from app.models.career import CareerGoal, Skill, Experience
 from app.services.llm_service import LLMOutputError, llm_service
 
-router = APIRouter(prefix="/career", tags=["career"])
+router = APIRouter(
+    prefix="/career",
+    tags=["career"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("/goals", response_model=CareerGoal)

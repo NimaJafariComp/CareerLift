@@ -13,15 +13,16 @@ import type {
 } from "@/components/job-finder/types";
 import { SOURCES } from "@/components/job-finder/types";
 import {
-  addJobToGraph,
   calculateAtsScores,
   deleteResume,
   fetchResumeGraph,
+  getSavedJobs,
   listResumes,
   loadJobsBySource,
   removeJobFromResume,
   saveJobToResume,
 } from "@/lib/jobFinderApi";
+import { useApplications } from "@/hooks/useApplications";
 
 const JF_STORAGE_KEY = "careerlift:jobfinder";
 
@@ -68,6 +69,8 @@ export function useJobFinder() {
   const [initialState] = useState<PersistedJobFinderState | null>(
     () => loadPersistedJobFinderState()
   );
+
+  const { saveApplication, isApplied: _isApplied } = useApplications();
 
   const [q, setQ] = useState(initialState?.q ?? "");
   const [loc, setLoc] = useState(initialState?.loc ?? "");
@@ -472,29 +475,57 @@ export function useJobFinder() {
 
     if (!selectedResume) {
       setNotice({
-        type: "info",
-        message:
-          "Saving without a selected resume will add the job to the graph, but it will not appear under a resume.",
+        type: "error",
+        message: "Select a resume above before saving — saved jobs are scoped per resume.",
       });
+      return;
     }
 
     setAddingToGraph((prev) => new Set(prev).add(jobUrl));
 
-    try {
-      const result = await addJobToGraph(job);
-      if (!result.success) {
-        throw new Error(result.message || "Failed to add job to knowledge graph");
-      }
+    // Optimistic state update; rolled back on failure.
+    setAddedToGraphByResume((prev) => {
+      const key = selectedResume.resume_id;
+      const existing = prev[key] ?? [];
+      if (existing.includes(jobUrl)) return prev;
+      return { ...prev, [key]: [...existing, jobUrl] };
+    });
 
-      setAddedToGraphByResume((prev) => {
-        const key = selectedResume?.resume_id ?? "";
-        const existing = prev[key] ?? [];
-        if (existing.includes(jobUrl)) return prev;
-        return { ...prev, [key]: [...existing, jobUrl] };
+    try {
+      // Single atomic call: backend MERGEs the JobPosting from the snapshot
+      // and creates the SAVED_JOB rel + OWNS rel in one transaction. No more
+      // race between addJobToGraph and saveJobToResume.
+      await saveJobToResume(selectedResume.resume_id, {
+        apply_url: jobUrl,
+        title: job.title || null,
+        company: job.company || null,
+        location: job.location || null,
+        source: job.source || null,
+        description: job.description || null,
+        salary_text: (job as any).salary_text || null,
+        employment_type: (job as any).employment_type || null,
+        remote: (job as any).remote ?? null,
+        posted_at: (job as any).posted_at || null,
+        source_url: job.source_url || null,
       });
 
-      if (selectedResume) {
-        await saveJobToResume(selectedResume.resume_id, jobUrl);
+      // Mirror the save to local applications so the Applications page and
+      // the dashboard ApplicationsCard see it. saveApplication is idempotent
+      // (no-op if an entry with the same id already exists).
+      const applicationId =
+        (job as any).source_job_id ??
+        `${job.title || "Untitled"}-${job.company || "Unknown"}`;
+      saveApplication({
+        id: applicationId,
+        title: job.title || "Untitled",
+        company: job.company || "",
+        salary: (job as any).salary_text ?? undefined,
+        url: jobUrl,
+        source: job.source || "graph",
+      });
+
+      // Refresh dashboard cards by republishing the active resume payload.
+      try {
         const graphJson = await fetchResumeGraph(selectedResume.person_name);
         const payload = {
           filename: selectedResume.resume_name,
@@ -503,26 +534,33 @@ export function useJobFinder() {
           nodes_created: 0,
           person_name: selectedResume.person_name,
           resume_name: selectedResume.resume_name,
+          resume_id: selectedResume.resume_id,
           storedAt: Date.now(),
         };
         localStorage.setItem("careerlift:lastResume", JSON.stringify(payload));
-        localStorage.setItem("careerlift:resume-updated", String(Date.now()));
         window.dispatchEvent(new Event("careerlift:resume-updated"));
+      } catch {
+        /* refresh is best-effort; the save already succeeded */
       }
 
       setNotice({
         type: "success",
-        message: selectedResume
-          ? "Job saved to the knowledge graph and linked to the selected resume."
-          : "Job saved to the knowledge graph.",
+        message: "Job saved and linked to the selected resume.",
       });
     } catch (err: unknown) {
+      // Roll back optimistic state.
+      setAddedToGraphByResume((prev) => {
+        const key = selectedResume.resume_id;
+        const existing = prev[key] ?? [];
+        const next = existing.filter((u) => u !== jobUrl);
+        return { ...prev, [key]: next };
+      });
       setNotice({
         type: "error",
         message:
           err instanceof Error
             ? err.message
-            : "Failed to add job to knowledge graph",
+            : "Failed to save the job to the selected resume.",
       });
     } finally {
       setAddingToGraph((prev) => {
@@ -584,6 +622,37 @@ export function useJobFinder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Hydrate the per-resume "saved" set from the backend for EVERY resume the
+  // user owns whenever the resume list changes. This way a job saved under
+  // resume A still shows a "Saved" tag while the user has resume B selected.
+  useEffect(() => {
+    if (availableResumes.length === 0) return;
+    let cancelled = false;
+    Promise.allSettled(
+      availableResumes.map((r) =>
+        getSavedJobs(r.resume_id).then(
+          (data) => [r.resume_id, data.jobs.map((j) => j.apply_url).filter(Boolean)] as const,
+        ),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      setAddedToGraphByResume((prev) => {
+        const next = { ...prev };
+        for (const result of results) {
+          if (result.status !== "fulfilled") continue;
+          const [resumeId, urls] = result.value;
+          // Merge with any optimistic local entries.
+          const merged = new Set([...(prev[resumeId] ?? []), ...urls]);
+          next[resumeId] = Array.from(merged);
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [availableResumes]);
+
   const totalJobs = Object.values(jobsBySource).reduce(
     (sum, jobs) => sum + jobs.length,
     0
@@ -603,6 +672,7 @@ export function useJobFinder() {
     sourceLimits,
     scoringJobs,
     addedToGraph,
+    addedToGraphByResume,
     addingToGraph,
     removingFromGraph,
     setQ,

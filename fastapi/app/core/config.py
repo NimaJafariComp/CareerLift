@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     kokoro_url: str = "http://localhost:8880"
     kokoro_voice: str = "af_heart"
 
+    # Auth (shared HS256 JWT between Next.js Auth.js and FastAPI)
+    auth_jwt_secret: str = ""
+    auth_jwt_issuer: str = "careerlift"
+    auth_jwt_ttl_hours: int = 720
+
+    # Bootstrapped seed user — auto-created on first startup so existing
+    # data has an owner and there's an account that can sign in without OAuth.
+    bootstrap_user_email: str = "user@careerlift.local"
+    bootstrap_user_password: str = ""
+    bootstrap_user_name: str = "user"
+
     # CORS
     cors_origins: list[str] = [
         "http://localhost:3000",

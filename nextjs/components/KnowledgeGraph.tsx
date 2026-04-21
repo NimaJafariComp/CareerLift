@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { DataSet, Network } from "vis-network/standalone";
 import type { Node as VNode, Edge as VEdge } from "vis-network";
 import "vis-network/styles/vis-network.css";
+import { apiFetch } from "@/lib/apiClient";
 
 // Types
 interface GraphData {
@@ -222,7 +223,7 @@ export default function KnowledgeGraph({ graphData, personName, apiUrl = (typeof
         if (!gdata) {
           // Fetch from API
           const url = `${apiUrl}/api/resume/graph/${encodeURIComponent(pn || "Unknown")}`;
-          const res = await fetch(url);
+          const res = await apiFetch(url);
           if (!res.ok) {
             // nothing
             return;

@@ -1,8 +1,12 @@
+import { useMemo } from "react";
 import type {
   Job,
+  Resume,
   SourceLoadingState,
   SourceDefinition,
 } from "@/components/job-finder/types";
+import { asString } from "@/lib/jobFinderApi";
+import { formatResumeLabel } from "@/lib/resumeLoader";
 
 interface SourceJobsPanelProps {
   source: SourceDefinition;
@@ -11,7 +15,9 @@ interface SourceJobsPanelProps {
   hasMoreJobs: boolean;
   sourceLimit: number;
   selectedResumeId: string | null;
+  availableResumes: Resume[];
   addedToGraph: Set<string>;
+  addedToGraphByResume: Record<string, string[]>;
   addingToGraph: Set<string>;
   removingFromGraph: Set<string>;
   scoringJobs: Set<string>;
@@ -39,7 +45,9 @@ export default function SourceJobsPanel({
   hasMoreJobs,
   sourceLimit,
   selectedResumeId,
+  availableResumes,
   addedToGraph,
+  addedToGraphByResume,
   addingToGraph,
   removingFromGraph,
   scoringJobs,
@@ -52,6 +60,21 @@ export default function SourceJobsPanel({
   onSaveToApplications,
   isAlreadyApplied,
 }: SourceJobsPanelProps) {
+  // url -> resumes (across the user's entire library) that have saved it
+  const linkedByUrl = useMemo(() => {
+    const map = new Map<string, Resume[]>();
+    for (const r of availableResumes) {
+      const urls = addedToGraphByResume[r.resume_id] ?? [];
+      for (const url of urls) {
+        if (!url) continue;
+        const existing = map.get(url) ?? [];
+        if (!existing.some((e) => e.resume_id === r.resume_id)) {
+          map.set(url, [...existing, r]);
+        }
+      }
+    }
+    return map;
+  }, [availableResumes, addedToGraphByResume]);
   const savedJobsInSource = jobs.filter(
     (j) => addedToGraph.has(j.apply_url || j.source_url || "")
   ).length;
@@ -136,7 +159,16 @@ export default function SourceJobsPanel({
               const isRemovingFromGraph = removingFromGraph.has(jobUrl);
               const isScoring = scoringJobs.has(jobKey);
               const jobId = job.source_job_id ?? `${job.title}-${job.company}`;
-              const isSavedToApplications = isAlreadyApplied(jobId);
+              // A job is "saved" if ANY resume in the user's library has it.
+              // Backend cross-resume hydration drives this, with localStorage
+              // as a fallback for legacy entries.
+              const linkedResumes = linkedByUrl.get(jobUrl) ?? [];
+              const isSavedAnywhere =
+                linkedResumes.length > 0 || isAddedToGraph || isAlreadyApplied(jobId);
+              // The unsave action only removes the job from the currently-
+              // selected resume; show it only if the selected resume actually
+              // has this job saved.
+              const isSavedUnderCurrent = isAddedToGraph;
               return (
                 <li
                   key={jobKey}
@@ -198,6 +230,34 @@ export default function SourceJobsPanel({
                     </div>
                   )}
 
+                  {/* Saved-state pill + linked resumes */}
+                  {isSavedAnywhere && (
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">
+                        ✓ Saved
+                      </span>
+                      {linkedResumes.length > 0 && (
+                        <span className="text-muted">on</span>
+                      )}
+                      {linkedResumes.map((r) => {
+                        const label = formatResumeLabel(r);
+                        const person = asString(r.person_name);
+                        return (
+                          <span
+                            key={r.resume_id}
+                            title={person ? `${label} (${person})` : label}
+                            className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)]/40 bg-[var(--accent)]/10 px-2 py-0.5 text-[var(--accent)]"
+                          >
+                            <span>{label}</span>
+                            {person && (
+                              <span className="text-[10px] opacity-80">· {person}</span>
+                            )}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-2">
                     {jobUrl && (
                       <a
@@ -205,8 +265,9 @@ export default function SourceJobsPanel({
                         className="jf-btn jf-btn-info px-2 py-1"
                         target="_blank"
                         rel="noreferrer"
+                        title={jobUrl}
                       >
-                        Apply
+                        URL ↗
                       </a>
                     )}
                     <button
@@ -222,13 +283,18 @@ export default function SourceJobsPanel({
                       {isScoring ? "Scoring..." : "Calculate ATS"}
                     </button>
 
-                     {isSavedToApplications ? (
+                    {isSavedUnderCurrent ? (
                       <button
                         onClick={() => onUnsave(job)}
-                        disabled = {isRemovingFromGraph}
+                        disabled={isRemovingFromGraph}
                         className="jf-btn px-2 py-1 border border-red-500/30 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                        title={
+                          selectedResumeId
+                            ? "Remove this job from the currently selected resume"
+                            : ""
+                        }
                       >
-                        {isRemovingFromGraph ? "Unsaving..." : "Unsave ✕"}
+                        {isRemovingFromGraph ? "Unsaving..." : "Unsave from current ✕"}
                       </button>
                     ) : (
                       <button
@@ -243,10 +309,21 @@ export default function SourceJobsPanel({
                             source: source.key,
                           });
                         }}
-                        disabled={isAddingToGraph}
+                        disabled={isAddingToGraph || !selectedResumeId}
                         className="jf-btn jf-btn-primary px-2 py-1"
+                        title={
+                          !selectedResumeId
+                            ? "Select a resume first to save this job"
+                            : isSavedAnywhere
+                              ? "Also save under the currently selected resume"
+                              : "Save this job to the selected resume"
+                        }
                       >
-                        {isAddingToGraph ? "Adding..." : "Save to Applications"}
+                        {isAddingToGraph
+                          ? "Adding..."
+                          : isSavedAnywhere
+                            ? "Save under current"
+                            : "Save to Applications"}
                       </button>
                     )}
                   </div>

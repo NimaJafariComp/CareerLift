@@ -55,7 +55,32 @@ cp .env.example .env
 
 Edit `.env` if you need to change default values.
 
-3. Build and start all services with Docker
+3. Pick a Kokoro TTS profile (optional but recommended)
+
+The Mock Interview reads questions aloud via Kokoro-82M. Two Docker profiles
+are available; pick one in `.env` via `COMPOSE_PROFILES` (defaults to `cpu`):
+
+```bash
+COMPOSE_PROFILES=cpu   # multi-arch image; ARM64-native on Apple Silicon (default)
+COMPOSE_PROFILES=gpu   # NVIDIA CUDA image; ~50-200x realtime on a modern GPU
+```
+
+Run the detection helper for a recommendation tailored to your host:
+
+```bash
+./scripts/kokoro-detect.sh
+```
+
+macOS / Apple Silicon users: Docker cannot expose Metal to Linux
+containers, so both profiles run on CPU inside Docker. For real Metal
+acceleration, run Kokoro natively via `./scripts/kokoro-mlx-native.sh`
+(see [docs/TTS.md](docs/TTS.md) if present, or the script's `help`
+command).
+
+AMD GPU users: build the community `moritzchow/Kokoro-FastAPI-ROCm` fork
+and swap the `kokoro-gpu` service's image locally.
+
+4. Build and start all services with Docker
 
 Standard mode:
 ```bash
@@ -69,7 +94,7 @@ docker compose watch
 
 Watch mode enables automatic file synchronization and hot-reloading for all services.
 
-4. Access the services
+5. Access the services
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
@@ -78,9 +103,9 @@ Watch mode enables automatic file synchronization and hot-reloading for all serv
 
 ### Mock Interview
 
-Once a resume has been uploaded, open the Coach Center in the frontend and start an interview. The tool will ask a few questions and evaluate your answers using the LLM.
+Once a resume has been uploaded, open the Coach Center in the frontend and start an interview. The tool will ask a few questions and evaluate your answers using the LLM. Questions are read aloud via the Kokoro TTS profile you chose in step 3.
 
-5. Pull Ollama model
+6. Pull Ollama model
 
 After services are running, pull an LLM model:
 
@@ -232,6 +257,36 @@ LLM Features
 - Job Analysis: Analyze job descriptions and extract key requirements
 - Resume Feedback: Receive LLM-based feedback on your resume
 - Web Scraping: Extract job postings and company information from websites
+
+Kokoro TTS profiles
+
+The `kokoro` service is scoped behind docker-compose profiles. Choose one of:
+
+| Profile | Image | Use when |
+|---|---|---|
+| `cpu` (default) | `ghcr.io/remsky/kokoro-fastapi-cpu:latest` | No GPU, Apple Silicon, or you want the simplest path. Multi-arch, ARM64-native. |
+| `gpu` | `ghcr.io/remsky/kokoro-fastapi-gpu:latest` | Linux host with an NVIDIA GPU and `nvidia-container-toolkit` installed. |
+
+Activate by editing `COMPOSE_PROFILES` in `.env` (persistent) or on the command line:
+
+```bash
+COMPOSE_PROFILES=gpu docker compose up -d
+# or
+docker compose --profile gpu up -d
+```
+
+Both services share a network alias of `kokoro`, so the backend's `KOKORO_URL=http://kokoro:8880` works unchanged across profiles.
+
+Verify the NVIDIA runtime is wired to Docker before flipping to `gpu`:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi
+```
+
+Scripts under `scripts/`:
+
+- `kokoro-detect.sh` — probes the host and recommends the right profile.
+- `kokoro-mlx-native.sh` — for macOS / Apple Silicon users who want real Metal acceleration; runs Kokoro natively via `mlx-audio` and points `KOKORO_URL` at `host.docker.internal`. Sub-commands: `install`, `run`, `wire`.
 
 Environment Variables
 

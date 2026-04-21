@@ -17,6 +17,11 @@ langchain-ollama
 httpx
 aiohttp
 
+# Auth
+pyjwt
+passlib[bcrypt]
+bcrypt<4.1
+
 # Docker
 docker
 

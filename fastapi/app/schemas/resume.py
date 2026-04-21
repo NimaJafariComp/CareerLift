@@ -26,10 +26,29 @@ class ResumeList(BaseModel):
     resumes: List[ResumeInfo]
 
 
+class JobSnapshot(BaseModel):
+    """Snapshot of a job posting; sufficient to MERGE the JobPosting node
+    server-side without a separate add-to-graph step."""
+    apply_url: str
+    title: Optional[str] = None
+    company: Optional[str] = None
+    location: Optional[str] = None
+    source: Optional[str] = None
+    description: Optional[str] = None
+    salary_text: Optional[str] = None
+    employment_type: Optional[str] = None
+    remote: Optional[bool] = None
+    posted_at: Optional[str] = None
+    source_url: Optional[str] = None
+
+
 class SavedJobCreate(BaseModel):
-    """Schema for saving a job to a resume."""
+    """Schema for saving a job to a resume. Accepts either the full snapshot
+    (preferred — atomic create-and-link) or just an apply URL (legacy)."""
     resume_id: str
-    job_apply_url: str
+    job: Optional[JobSnapshot] = None
+    # Legacy field: kept so older clients that send just a URL still work.
+    job_apply_url: Optional[str] = None
     notes: Optional[str] = None
 
 

@@ -11,6 +11,7 @@ import {
   InterviewEvaluation,
 } from "@/lib/interviewApi";
 import { getApiBase } from "@/lib/jobFinderApi";
+import { apiFetch } from "@/lib/apiClient";
 
 declare global {
   interface Window {
@@ -127,7 +128,7 @@ export default function MockInterview({
     if (cached) return cached;
     const promise = (async () => {
       const base = getApiBase();
-      const res = await fetch(`${base}/api/tts/speak`, {
+      const res = await apiFetch(`${base}/api/tts/speak`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, format: "mp3" }),
