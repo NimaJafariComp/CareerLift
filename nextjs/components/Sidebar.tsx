@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import React, { useEffect, useState, type ReactNode } from "react";
+import { CLLogo } from "@/components/BrandLogo";
 
 interface NavItem {
   label: string;
@@ -120,47 +121,6 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
       viewBox="0 0 24 24"
     >
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-    </svg>
-  );
-}
-
-/** Stylized "CL" monogram. Rounded-square background in the app's accent
- *  gradient with a hand-drawn C arc + L stroke, the L's foot ticking upward
- *  to evoke "lift". */
-function CLLogo({ size = 32, className }: { size?: number; className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 64 64"
-      width={size}
-      height={size}
-      role="img"
-      aria-label="CareerLift"
-      className={className}
-    >
-      <defs>
-        <linearGradient id="cl-logo-bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--accent)" />
-          <stop offset="100%" stopColor="var(--accent-strong, var(--accent))" />
-        </linearGradient>
-      </defs>
-      <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#cl-logo-bg)" />
-      {/* C: open arc on the left */}
-      <path
-        d="M 32 18 a 14 14 0 1 0 0 28"
-        fill="none"
-        stroke="white"
-        strokeWidth="6"
-        strokeLinecap="round"
-      />
-      {/* L: vertical down + horizontal right with a small upward tick */}
-      <path
-        d="M 38 18 v 26 h 12 l 0 -3"
-        fill="none"
-        stroke="white"
-        strokeWidth="6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
